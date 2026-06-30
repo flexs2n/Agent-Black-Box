@@ -1,8 +1,8 @@
 services:
   api:
     build:
-      context: ../apps/api
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/api/Dockerfile
     ports:
       - "4000:4000"
     environment:
@@ -24,8 +24,8 @@ services:
 
   diff-service:
     build:
-      context: ../apps/diff-service
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/diff-service/Dockerfile
     ports:
       - "5001:5001"
     environment:
@@ -39,8 +39,8 @@ services:
 
   web:
     build:
-      context: ../apps/web
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/web/Dockerfile
     ports:
       - "3000:3000"
     environment:

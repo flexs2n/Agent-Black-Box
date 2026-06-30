@@ -1,13 +1,1 @@
-.git
-.github
-node_modules
-dist
-build
-*.test
-*.prof
-*.db
-*.duckdb
-.env
-.env.*
-.idea
-.vscode
+go.sum

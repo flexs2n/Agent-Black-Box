@@ -16,7 +16,15 @@ type SQLiteStore struct {
 }
 
 func NewSQLiteStore(databaseURL string) (*SQLiteStore, error) {
-	db, err := sqlx.Open("sqlite", databaseURL)
+	dsn := databaseURL
+	if !strings.Contains(dsn, "_time_format=") {
+		if strings.Contains(dsn, "?") {
+			dsn += "&_time_format=sqlite"
+		} else {
+			dsn += "?_time_format=sqlite"
+		}
+	}
+	db, err := sqlx.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
 	}

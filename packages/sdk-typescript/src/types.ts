@@ -45,6 +45,7 @@ export interface SpanContext {
   outputTokens?: number;
   durationMs?: number;
   error?: string;
+  record(options?: RecordOptions): void;
 }
 
 export interface TraceContext {

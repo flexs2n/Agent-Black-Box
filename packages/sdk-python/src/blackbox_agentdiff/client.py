@@ -191,6 +191,15 @@ class SpanContext:
 _config: Optional[Config] = None
 
 
+def resolve_config(overrides: Optional[Dict[str, Any]] = None) -> Config:
+    if overrides:
+        api_key = overrides.get("api_key", os.environ.get("BLACKBOX_API_KEY", ""))
+        project_id = overrides.get("project_id", os.environ.get("BLACKBOX_PROJECT_ID", ""))
+        base_url = overrides.get("base_url", os.environ.get("BLACKBOX_BASE_URL", "http://localhost:4000"))
+        return Config(api_key=api_key, project_id=project_id, base_url=base_url)
+    return _get_config()
+
+
 def _get_config() -> Config:
     if _config is None:
         api_key = os.environ.get("BLACKBOX_API_KEY", "")

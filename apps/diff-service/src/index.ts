@@ -73,8 +73,16 @@ app.post('/internal/diff', async (c) => {
     const aTree = makeNorm(rawA);
     const bTree = makeNorm(rawB);
 
-    const aSpans = [aTree, ...aTree.children.map((c: any) => c)];
-    const bSpans = [bTree, ...bTree.children.map((c: any) => c)];
+    const flattenTree = (node: any): any[] => {
+      const result = [node];
+      for (const child of node.children ?? []) {
+        result.push(...flattenTree(child));
+      }
+      return result;
+    };
+
+    const aSpans = flattenTree(aTree);
+    const bSpans = flattenTree(bTree);
 
     const statsA = parsed.statsA ?? { totalSpans: aSpans.length, llmCallCount: 0, toolCallCount: 0, totalInputTokens: 0, totalOutputTokens: 0, totalDurationMs: 0 };
     const statsB = parsed.statsB ?? { totalSpans: bSpans.length, llmCallCount: 0, toolCallCount: 0, totalInputTokens: 0, totalOutputTokens: 0, totalDurationMs: 0 };

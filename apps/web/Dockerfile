@@ -1,30 +1,18 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS base
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
+FROM base AS builder
 WORKDIR /app
-
-COPY package.json ./
-COPY tsconfig.json ./
-COPY tailwind.config.js ./
-COPY postcss.config.js ./
-COPY next.config.js ./
-
-RUN npm install
-
-COPY . .
-
-RUN npm run build
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.json ./
+COPY apps/web ./apps/web
+RUN pnpm install --frozen-lockfile --filter web
+RUN pnpm --filter web run build
 
 FROM node:20-alpine
-
 WORKDIR /app
-
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
+COPY --from=builder /app/apps/web/.next/standalone/. ./
+COPY --from=builder /app/apps/web/.next/static ./.next/static
 EXPOSE 3000
-
 ENV PORT=3000
 ENV NODE_ENV=production
-
 CMD ["node", "server.js"]

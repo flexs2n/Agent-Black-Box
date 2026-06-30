@@ -19,17 +19,17 @@ def reset_env(monkeypatch):
 
 class TestConfig:
     def test_resolve_config(self):
-        from blackbox_agentdiff.client import resolveConfig
-        config = resolveConfig()
+        from blackbox_agentdiff.client import resolve_config
+        config = resolve_config()
         assert config.api_key == "test-key"
         assert config.project_id == "test-project"
         assert config.base_url == "http://localhost:4000"
 
     def test_resolve_config_overrides(self):
-        from blackbox_agentdiff.client import resolveConfig
-        config = resolveConfig({
-            apiKey: "override-key",
-            projectId: "override-project",
+        from blackbox_agentdiff.client import resolve_config
+        config = resolve_config({
+            "api_key": "override-key",
+            "project_id": "override-project",
         })
         assert config.api_key == "override-key"
         assert config.project_id == "override-project"
@@ -40,7 +40,7 @@ class TestTraceContext:
         ctx = trace("test-trace")
         assert ctx is not None
         assert ctx.name == "test-trace"
-        assert ctx.traceId is not None
+        assert ctx.trace_id is not None
 
     def test_trace_with_input(self):
         ctx = trace("test", input={"msg": "hello"})

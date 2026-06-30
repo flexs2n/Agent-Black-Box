@@ -140,7 +140,7 @@ function createSpan(init: {
   model?: string;
   input?: Record<string, unknown>;
 }): SpanContext {
-  return {
+  const span: SpanContext = {
     traceId: init.traceId,
     projectId: init.projectId,
     name: init.name,
@@ -150,7 +150,13 @@ function createSpan(init: {
     attributes: {},
     model: init.model,
     input: init.input,
+    record(options?: RecordOptions): void {
+      span.endTime = Date.now();
+      span.durationMs = span.endTime - span.startTime;
+      encodeRecordOptions(span, options);
+    },
   };
+  return span;
 }
 
 async function exportTrace(trace: TraceContext, config: BlackboxConfig): Promise<void> {
@@ -196,8 +202,8 @@ async function exportTrace(trace: TraceContext, config: BlackboxConfig): Promise
       parentSpanId: span.spanKind === "generation" ? trace.traceId : undefined,
       name: span.name,
       kind: span.spanKind === "generation" ? 1 : span.spanKind === "tool" ? 4 : 13,
-      startTimeUnixNano: BigInt(span.startTime * 1_000_000),
-      endTimeUnixNano: BigInt((span.endTime ?? span.startTime + durationMs) * 1_000_000),
+      startTimeUnixNano: span.startTime * 1_000_000,
+      endTimeUnixNano: (span.endTime ?? span.startTime + durationMs) * 1_000_000,
       attributes: Object.entries(attrs).map(([key, value]) => ({
         key,
         value: { stringValue: JSON.stringify(value) },

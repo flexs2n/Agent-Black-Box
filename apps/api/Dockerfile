@@ -1,16 +1,20 @@
 # Stage 1: Build
 FROM golang:1.23-alpine AS builder
 
-RUN apk add --no-cache git build-base
+ENV GONOSUMCHECK=*
+ENV GONOSUMDB=*
+ENV GOFLAGS=-mod=mod
+
+RUN apk add --no-cache git
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY go.mod ./
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=1 go build -o server ./cmd/server
+RUN CGO_ENABLED=0 go build -o server ./cmd/server
 
 # Stage 2: Runtime
 FROM alpine:latest

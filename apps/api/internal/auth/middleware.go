@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/blackbox-agentdiff/api/internal/store"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type contextKey string
@@ -28,8 +29,8 @@ func Middleware(st store.Store) func(http.Handler) http.Handler {
 			}
 			raw := strings.TrimPrefix(auth, "Bearer ")
 			prefix := raw
-			if len(raw) > 8 {
-				prefix = raw[:8]
+			if len(raw) > 12 {
+				prefix = raw[:12]
 			}
 			key, err := st.APIKeyGetByPrefix(r.Context(), prefix)
 			if err != nil {
@@ -38,6 +39,10 @@ func Middleware(st store.Store) func(http.Handler) http.Handler {
 					return
 				}
 				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+			if err := bcrypt.CompareHashAndPassword([]byte(key.KeyHash), []byte(raw)); err != nil {
+				http.Error(w, "invalid API key", http.StatusUnauthorized)
 				return
 			}
 			ctx := context.WithValue(r.Context(), ProjectIDKey, key.ProjectID)

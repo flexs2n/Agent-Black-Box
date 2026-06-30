@@ -8,7 +8,9 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"github.com/blackbox-agentdiff/api/internal/auth"
 	"github.com/blackbox-agentdiff/api/internal/config"
+	"github.com/blackbox-agentdiff/api/internal/diffproxy"
 	"github.com/blackbox-agentdiff/api/internal/ingest"
 	"github.com/blackbox-agentdiff/api/internal/migrate"
 	"github.com/blackbox-agentdiff/api/internal/rest"
@@ -36,6 +38,8 @@ func main() {
 	}
 	defer st.Close()
 
+	diffClient := diffproxy.NewClient(cfg.DiffServiceURL)
+
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"*"},
@@ -57,9 +61,13 @@ func main() {
 		w.Write([]byte(`{"status":"ready"}`))
 	})
 
-	r.Post("/otel/v1/traces", ingest.NewHandler(st).HTTP)
+	otelGroup := r.Group(func(r chi.Router) {
+		r.Use(auth.Middleware(st))
+		r.Post("/otel/v1/traces", ingest.NewHandler(st).HTTP)
+	})
+	_ = otelGroup
 
-	handlers := rest.New(st)
+	handlers := rest.New(st, diffClient)
 	handlers.Register(r)
 
 	srv := &http.Server{

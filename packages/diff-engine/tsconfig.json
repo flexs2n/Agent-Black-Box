@@ -5,6 +5,7 @@
     "rootDir": "src",
     "noEmit": false,
     "composite": true,
+    "downlevelIteration": true,
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*"],
