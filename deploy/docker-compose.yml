@@ -1,0 +1,50 @@
+services:
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/blackbox.db
+      - DUCKDB_PATH=./data/spans.duckdb
+      - SECRET_KEY=dev-secret-key-change-me-in-production
+      - DIFF_SERVICE_URL=http://diff-service:5001
+      - LOG_LEVEL=info
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      diff-service:
+        condition: service_healthy
+
+  diff-service:
+    build:
+      context: ../apps/diff-service
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:4000
+    depends_on:
+      api:
+        condition: service_healthy

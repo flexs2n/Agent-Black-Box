@@ -1,0 +1,14 @@
+github.com/go-chi/chi/v5 v5.2.1 h1:KOehfqVDyVo3nzYkAsfGeIE6k0g5dpoGaUjtsDUXAZs=
+github.com/go-chi/chi/v5 v5.2.1/go.mod h1:L2yAIGWB3Hvo4bqIyQPi3R2A6t7PIWF54dTheRmQnPM=
+github.com/go-chi/cors v1.2.1 h1:xJ8ZfmOpLVBuyC1qjHF044mgY2KoVtkuONNskUOxKwM=
+github.com/go-chi/cors v1.2.1/go.mod h1:FvTb0oC4lWIGqGtPPeJXPM1I7ux9GgmBoH9w1dGkjhU=
+github.com/google/uuid v1.6.0 h1:NIvaJDmSj7G7UK0QkBCDh6Lo3I6snuyDB+cfmqMw73A=
+github.com/google/uuid v1.6.0/go.mod h1:TIMM4LYiYaOfcSyKaE4uEkp59yP8PQ1L1wzP1QBxnqQ=
+github.com/jmoiron/sqlx v1.4.0 h1:1Kq7zJfpwGxW3d0SYpeNTYST0eRRECSflQLj+h29TqA=
+github.com/jmoiron/sqlx v1.4.0/go.mod h1:1rI6q5m3SSafP7GZvmDAOyTVMU16CEK5GvPmoGeOB4w=
+github.com/joho/godotenv v1.5.1 h1:3m3p1VbpgjBtCXn5KsEKAF188hhUecsoX4milJs7ij0=
+github.com/joho/godotenv v1.5.1/go.mod h1:mut5WdRHAQjJaNdCk66kEhWpCmHzegBdZwShY5NTqA8=
+modernc.org/sqlite v1.32.0 h1:rNW3rWnfh9L9rTsNC4rk4GvGSyPHfMwNObGdYuxnP/w=
+modernc.org/sqlite v1.32.0/go.mod h1:UgjnwsI0OOC4t/dBYeNPPN4BVcHh3BRERZODL1Wld24=
+golang.org/x/crypto v0.31.0 h1:ihxqm4OQTXMuRH03wV9UUWIML+euUOCkQQRvMs6Tp3A=
+golang.org/x/crypto v0.31.0/go.mod h1:6vG9qnYXwRnFx0sE4T7UeMfiOJe5oBGcS/O9ZtJ4BJY=

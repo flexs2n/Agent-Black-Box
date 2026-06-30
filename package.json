@@ -1,0 +1,21 @@
+{
+  "name": "blackbox-agentdiff",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run lint",
+    "typecheck": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run typecheck",
+    "test": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run test",
+    "build": "pnpm --filter \"./packages/**\" --filter \"./apps/**\" run build",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\"",
+    "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\""
+  },
+  "devDependencies": {
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  },
+  "packageManager": "pnpm@9.6.0",
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

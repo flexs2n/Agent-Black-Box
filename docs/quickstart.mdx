@@ -1,0 +1,101 @@
+# Quickstart
+
+Get Blackbox-AgentDiff running in 5 minutes with Docker Compose.
+
+## Prerequisites
+
+- **Docker** 24+
+- **Docker Compose** v2+
+- **Python 3.9+** or **Node.js 20+** (for SDK examples)
+
+## Start the Stack
+
+```bash
+# From the repo root
+docker compose -f deploy/docker-compose.yml up -d
+
+# Verify all services are healthy
+curl http://localhost:4000/healthz   # API
+curl http://localhost:5001/healthz   # Diff Service
+curl http://localhost:3000           # Web UI
+```
+
+## Open the UI
+
+Navigate to [http://localhost:3000](http://localhost:3000). You should see the Blackbox home page.
+
+## Configure API Key
+
+The API requires a key for all requests. Create one via the Settings page in the Web UI:
+
+1. Go to **Settings**
+2. Create a **Project** (if you don't have one)
+3. Click **Create Key** and copy the plaintext key
+
+## Send Your First Trace
+
+### Python
+
+```bash
+export BLACKBOX_API_KEY="your-key-here"
+export BLACKBOX_PROJECT_ID="your-project-id"
+export BLACKBOX_BASE_URL="http://localhost:4000"
+```
+
+```python
+import blackbox
+
+blackbox.init()
+
+with blackbox.trace("quickstart-demo", input={"message": "Hello world"}) as trace:
+    with trace.generation("greet", model="gpt-4o") as gen:
+        gen.record(
+            input=[{"role": "user", "content": "Say hi"}],
+            output="Hello! How can I help?",
+            input_tokens=5,
+            output_tokens=8,
+        )
+
+    trace.set_output({"reply": "Hello! How can I help?"})
+```
+
+### TypeScript
+
+```bash
+export BLACKBOX_API_KEY="your-key-here"
+export BLACKBOX_PROJECT_ID="your-project-id"
+export BLACKBOX_BASE_URL="http://localhost:4000"
+```
+
+```typescript
+import { Blackbox, trace } from "blackbox-agentdiff";
+
+const bb = new Blackbox();
+
+const t = bb.trace("quickstart-demo", {
+  input: { message: "Hello world" },
+});
+
+const gen = t.generation("greet", { model: "gpt-4o" });
+gen.record({
+  input: [{ role: "user", content: "Say hi" }],
+  output: "Hello! How can I help?",
+  inputTokens: 5,
+  outputTokens: 8,
+});
+
+t.setOutput({ reply: "Hello! How can I help?" });
+await t.end();
+```
+
+## Verify the Trace
+
+1. Go back to the **Traces** page in the UI
+2. You should see your trace listed
+3. Click on it to view the span tree and details
+
+## What's Next?
+
+- Read [OTLP Integration](./otel-integration.mdx) to instrument Langfuse, OpenInference, Arize, Braintrust, or raw OTel
+- Read [Self-Hosting](./self-hosting.mdx) for production deployment
+- Explore the [API Reference](../README.md#api-reference)

@@ -1,0 +1,117 @@
+# OTLP Integration
+
+Blackbox ingests traces via the OTLP protocol, so any OpenTelemetry-compatible SDK can send data with minimal configuration.
+
+## Supported SDKs
+
+- **Langfuse** (`@langfuse/otel`)
+- **OpenInference** (Arize Phoenix, Braintrust, LangSmith)
+- **Raw OpenTelemetry** (any language)
+- **Blackbox SDKs** (Python, TypeScript)
+
+## Endpoint
+
+```
+POST {BLACKBOX_BASE_URL}/otel/v1/traces
+Headers:
+  Authorization: Bearer {BLACKBOX_API_KEY}
+  X-Blackbox-Project-ID: {PROJECT_ID}
+  Content-Type: application/json (or application/x-protobuf)
+```
+
+## Langfuse (TypeScript)
+
+```typescript
+import { LangfuseExporter } from "langfuse-otel";
+
+const exporter = new LangfuseExporter({
+  serviceName: "my-agent",
+  publicKey: process.env.LANGFUSE_PUBLIC_KEY,
+  secretKey: process.env.LANGFUSE_SECRET_KEY,
+});
+
+// Override the export endpoint to point at Blackbox
+exporter.endpoint = process.env.BLACKBOX_BASE_URL + "/otel/v1/traces";
+exporter.headers = {
+  Authorization: `Bearer ${process.env.BLACKBOX_API_KEY}`,
+  "X-Blackbox-Project-ID": process.env.BLACKBOX_PROJECT_ID,
+};
+
+// Use the exporter in your Node SDK
+```
+
+## OpenTelemetry (Python)
+
+```python
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+provider = TracerProvider()
+processor = BatchSpanProcessor(OTLPSpanExporter(
+    endpoint="http://localhost:4000/otel/v1/traces",
+    headers={
+        "Authorization": f"Bearer {BLACKBOX_API_KEY}",
+        "X-Blackbox-Project-ID": BLACKBOX_PROJECT_ID,
+    },
+))
+provider.add_span_processor(processor)
+trace.set_tracer_provider(provider)
+```
+
+## Raw OTLP-JSON
+
+Send a JSON payload directly:
+
+```bash
+curl -X POST http://localhost:4000/otel/v1/traces \
+  -H "Authorization: Bearer $BLACKBOX_API_KEY" \
+  -H "X-Blackbox-Project-ID: $BLACKBOX_PROJECT_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceSpans": [{
+      "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "my-service"}}]},
+      "scopeSpans": [{
+        "scope": {"name": "my-app"},
+        "spans": [{
+          "traceId": "...",
+          "spanId": "...",
+          "name": "agent-run",
+          "kind": 1,
+          "startTimeUnixNano": 1700000000000000000,
+          "endTimeUnixNano": 1700000010000000000,
+          "attributes": [
+            {"key": "blackbox.agent_name", "value": {"stringValue": "support-agent"}},
+            {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o"}}
+          ],
+          "status": {"code": 1}
+        }]
+      }]
+    }]
+  }'
+```
+
+## Attribute Mapping
+
+Blackbox reads standard OTel attributes and also understands convention-specific namespaces:
+
+| Attribute | Meaning |
+|-----------|---------|
+| `blackbox.agent_name` | Human-readable agent name |
+| `blackbox.environment` | `production` / `staging` / `development` |
+| `blackbox.user_id` | End-user ID |
+| `blackbox.thread_id` | Multi-turn conversation ID |
+| `gen_ai.request.model` | LLM model name |
+| `gen_ai.usage.input_tokens` | Input token count |
+| `gen_ai.usage.output_tokens` | Output token count |
+| `gen_ai.prompt` | Full prompt text |
+| `gen_ai.completion` | Model response |
+| `tool.name` | Tool/function name |
+| `tool.input` | JSON-serialized arguments |
+| `tool.output` | JSON-serialized result |
+| `exception.message` | Error message |
+
+## Trace Structure Rule
+
+One agent execution = **one trace**. Never split a single execution across multiple traces. Use `blackbox.thread_id` to link multi-turn conversations.

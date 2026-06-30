@@ -1,0 +1,31 @@
+{
+  "name": "@blackbox/diff-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "build": "tsc",
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "format:check": "prettier --check src",
+    "format:write": "prettier --write src"
+  },
+  "dependencies": {
+    "@blackbox/diff-engine": "workspace:*",
+    "hono": "^4.6.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "eslint": "catalog:",
+    "prettier": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript-eslint/eslint-plugin": "catalog:",
+    "@typescript-eslint/parser": "catalog:",
+    "eslint-config-prettier": "catalog:"
+  }
+}

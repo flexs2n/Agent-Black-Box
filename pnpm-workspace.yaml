@@ -1,0 +1,15 @@
+packages:
+  - apps/web
+  - apps/diff-service
+  - packages/diff-engine
+  - packages/sdk-typescript
+
+catalog:
+  typescript: ^5.5.4
+  vitest: ^2.0.5
+  eslint: ^9.9.0
+  prettier: ^3.3.3
+  "@types/node": ^20.14.12
+  "eslint-config-prettier": ^9.1.0
+  "@typescript-eslint/eslint-plugin": ^8.0.0
+  "@typescript-eslint/parser": ^8.0.0

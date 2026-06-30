@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@blackbox/diff-engine": ["packages/diff-engine/src"],
+      "@blackbox/sdk-typescript": ["packages/sdk-typescript/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next", "apps/api"]
+}

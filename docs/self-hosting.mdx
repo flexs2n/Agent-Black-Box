@@ -1,0 +1,103 @@
+# Self-Hosting
+
+Blackbox is designed to run entirely on your infrastructure. This guide covers production deployment considerations.
+
+## Storage Backends
+
+### Local / Single Server (Default)
+
+| Component | Technology | Notes |
+|-----------|-----------|-------|
+| Relational DB | SQLite | Zero-config, auto-migrate on startup |
+| Column Store | DuckDB | In-process OLAP; replace ClickHouse for < 1M spans |
+| Vector Store | SQLite-vec | SQLite extension for embeddings (Phase 4+) |
+
+```bash
+# Default paths (configurable via env)
+DATABASE_URL=sqlite:///./data/blackbox.db
+DUCKDB_PATH=./data/spans.duckdb
+```
+
+### Team Self-Hosting (~10M spans/month)
+
+| Component | Technology |
+|-----------|-----------|
+| Relational DB | Postgres 15+ |
+| Column Store | ClickHouse OSS (single node) |
+| Vector Store | pgvector extension |
+| Queue | Redis + BullMQ |
+
+### Enterprise
+
+| Component | Technology |
+|-----------|-----------|
+| Relational DB | Postgres with read replica |
+| Column Store | ClickHouse cluster |
+| Queue | Kafka |
+| Cache | Redis |
+
+## Security
+
+- All API keys are bcrypt-hashed before storage
+- Plaintext keys are shown **once** at creation and never stored
+- Use TLS in production (terminate at reverse proxy)
+- Set a strong `SECRET_KEY` (32+ chars)
+- Rotate API keys regularly via the Settings UI
+
+## Reverse Proxy (Recommended)
+
+Route through Nginx, Caddy, or your cloud load balancer:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name blackbox.example.com;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+## Monitoring
+
+- `GET /healthz` — liveness check
+- `GET /readyz` — readiness check (verifies DB connection)
+- Diff service: `GET http://diff-service:5001/healthz`
+
+## Data Retention
+
+Clean up old traces via a cron job or scheduled task:
+
+```sql
+-- Delete traces older than 30 days
+DELETE FROM traces WHERE created_at < datetime('now', '-30 days');
+DELETE FROM spans WHERE trace_id NOT IN (SELECT id FROM traces);
+DELETE FROM trace_stats WHERE trace_id NOT IN (SELECT id FROM traces);
+```
+
+## Backups
+
+```bash
+# SQLite
+cp data/blackbox.db data/backups/blackbox-$(date +%Y%m%d).db
+cp data/spans.duckdb data/backups/spans-$(date +%Y%m%d).duckdb
+```
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Yes | SQLite connection string |
+| `DUCKDB_PATH` | No | DuckDB path (default: `./data/spans.duckdb`) |
+| `SECRET_KEY` | Yes | Random 32+ char string |
+| `DIFF_SERVICE_URL` | No | Diff service URL |
+| `LOG_LEVEL` | No | `debug` / `info` / `warn` / `error` |

@@ -34,3 +34,38 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Go
+/bin/
+/vendor/
+*.exe
+*.test
+*.prof
+
+# Docker
+data/
+*.duckdb
+*.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+
+# pnpm
+pnpm-lock.yaml
+!pnpm-lock.yaml
+
+# Build outputs
+dist/
+*.tgz
+.kilo/
+.editorconfig
+.prettierrc
+AGENTS.md
+blackbox-agentdiff-spec.md
+CONTRIBUTING.md
