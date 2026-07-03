@@ -86,6 +86,75 @@ export interface Baseline {
   created_at: string;
 }
 
+export interface Issue {
+  id: string;
+  project_id: string;
+  fingerprint: string;
+  title: string;
+  evaluator: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  status: 'open' | 'acknowledged' | 'resolved' | 'dismissed';
+  first_seen_at: string;
+  last_seen_at: string;
+  occurrence_count: number;
+  root_cause?: string;
+  suggested_fix?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IssueOccurrence {
+  id: string;
+  issue_id: string;
+  trace_id: string;
+  evidence: string;
+  created_at: string;
+}
+
+export interface Metric {
+  id: string;
+  project_id: string;
+  name: string;
+  aggregation: string;
+  filter_json: string;
+  window_secs: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MetricWithSparkline extends Metric {
+  current_value: number;
+  sparkline: number[];
+}
+
+export interface DashboardStats {
+  total_traces: number;
+  success_rate: number;
+  p95_latency_ms: number;
+  open_issues: number;
+  active_incidents: number;
+  total_llm_calls: number;
+  total_tool_calls: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+}
+
+export interface TraceByHour {
+  hour: string;
+  count: number;
+  success_count: number;
+  error_count: number;
+  avg_duration: number;
+}
+
+export interface DashboardResponse {
+  stats: DashboardStats;
+  traces_by_hour: TraceByHour[];
+  open_issues: Issue[];
+}
+
+export type IssueStatus = 'open' | 'acknowledged' | 'resolved' | 'dismissed';
+
 async function request<T>(path: string, options?: RequestInit, apiKey?: string): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -117,51 +186,115 @@ export const api = {
     return request<void>(`/api/v1/traces/${id}`, { method: 'DELETE' }, apiKey);
   },
   deleteTraces(ids: string[], apiKey?: string): Promise<void> {
-    return request<void>('/api/v1/traces', {
-      method: 'DELETE',
-      body: JSON.stringify({ ids }),
-    }, apiKey);
+    return request<void>(
+      '/api/v1/traces',
+      {
+        method: 'DELETE',
+        body: JSON.stringify({ ids }),
+      },
+      apiKey
+    );
   },
   computeDiff(traceAId: string, traceBId: string, apiKey?: string): Promise<DiffResult> {
-    return request<DiffResult>('/api/v1/diffs', {
-      method: 'POST',
-      body: JSON.stringify({ trace_a_id: traceAId, trace_b_id: traceBId }),
-    }, apiKey);
+    return request<DiffResult>(
+      '/api/v1/diffs',
+      {
+        method: 'POST',
+        body: JSON.stringify({ trace_a_id: traceAId, trace_b_id: traceBId }),
+      },
+      apiKey
+    );
   },
   getDiff(id: string, apiKey?: string): Promise<DiffResult & { id: string; created_at: string }> {
-    return request<DiffResult & { id: string; created_at: string }>(`/api/v1/diffs/${id}`, undefined, apiKey);
+    return request<DiffResult & { id: string; created_at: string }>(
+      `/api/v1/diffs/${id}`,
+      undefined,
+      apiKey
+    );
   },
   listProjects(apiKey?: string): Promise<Project[]> {
     return request<Project[]>('/api/v1/projects', undefined, apiKey);
   },
   createProject(name: string, slug: string, apiKey?: string): Promise<Project> {
-    return request<Project>('/api/v1/projects', {
-      method: 'POST',
-      body: JSON.stringify({ name, slug }),
-    }, apiKey);
+    return request<Project>(
+      '/api/v1/projects',
+      {
+        method: 'POST',
+        body: JSON.stringify({ name, slug }),
+      },
+      apiKey
+    );
   },
-  createApiKey(projectId: string, label: string, apiKey?: string): Promise<{ id: string; plain_key: string }> {
-    return request<{ id: string; plain_key: string }>(`/api/v1/projects/${projectId}/api-keys`, {
-      method: 'POST',
-      body: JSON.stringify({ label }),
-    }, apiKey);
+  createApiKey(
+    projectId: string,
+    label: string,
+    apiKey?: string
+  ): Promise<{ id: string; plain_key: string }> {
+    return request<{ id: string; plain_key: string }>(
+      `/api/v1/projects/${projectId}/api-keys`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ label }),
+      },
+      apiKey
+    );
   },
   listApiKeys(projectId: string, apiKey?: string): Promise<APIKey[]> {
     return request<APIKey[]>(`/api/v1/projects/${projectId}/api-keys`, undefined, apiKey);
   },
   deleteApiKey(projectId: string, keyId: string, apiKey?: string): Promise<void> {
-    return request<void>(`/api/v1/projects/${projectId}/api-keys/${keyId}`, { method: 'DELETE' }, apiKey);
+    return request<void>(
+      `/api/v1/projects/${projectId}/api-keys/${keyId}`,
+      { method: 'DELETE' },
+      apiKey
+    );
   },
-  createBaseline(projectId: string, traceId: string, label: string, notes?: string, apiKey?: string): Promise<Baseline> {
-    return request<Baseline>('/api/v1/baselines', {
-      method: 'POST',
-      body: JSON.stringify({ project_id: projectId, trace_id: traceId, label, notes }),
-    }, apiKey);
+  createBaseline(
+    projectId: string,
+    traceId: string,
+    label: string,
+    notes?: string,
+    apiKey?: string
+  ): Promise<Baseline> {
+    return request<Baseline>(
+      '/api/v1/baselines',
+      {
+        method: 'POST',
+        body: JSON.stringify({ project_id: projectId, trace_id: traceId, label, notes }),
+      },
+      apiKey
+    );
   },
   listBaselines(apiKey?: string): Promise<Baseline[]> {
     return request<Baseline[]>('/api/v1/baselines', undefined, apiKey);
   },
   deleteBaseline(id: string, apiKey?: string): Promise<void> {
     return request<void>(`/api/v1/baselines/${id}`, { method: 'DELETE' }, apiKey);
+  },
+  getDashboard(apiKey?: string): Promise<DashboardResponse> {
+    return request<DashboardResponse>('/api/v1/dashboard', undefined, apiKey);
+  },
+  listIssues(apiKey?: string): Promise<Issue[]> {
+    return request<Issue[]>('/api/v1/issues', undefined, apiKey);
+  },
+  getIssue(id: string, apiKey?: string): Promise<Issue & { occurrences?: IssueOccurrence[] }> {
+    return request<Issue & { occurrences?: IssueOccurrence[] }>(
+      `/api/v1/issues/${id}`,
+      undefined,
+      apiKey
+    );
+  },
+  updateIssueStatus(id: string, status: IssueStatus, apiKey?: string): Promise<Issue> {
+    return request<Issue>(
+      `/api/v1/issues/${id}/status`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      },
+      apiKey
+    );
+  },
+  listMetrics(apiKey?: string): Promise<MetricWithSparkline[]> {
+    return request<MetricWithSparkline[]>('/api/v1/metrics', undefined, apiKey);
   },
 };

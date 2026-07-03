@@ -30,24 +30,38 @@ func (h *Handlers) Register(r chi.Router) {
 	r.Get("/readyz", h.Readyz)
 
 	r.Route("/api/v1", func(api chi.Router) {
-		api.Use(auth.Middleware(h.store))
-		api.Get("/traces", h.ListTraces)
-		api.Get("/traces/{id}", h.GetTrace)
-		api.Get("/traces/{id}/spans", h.GetSpans)
-		api.Delete("/traces/{id}", h.DeleteTrace)
-		api.Delete("/traces", h.DeleteTraces)
-		api.Post("/traces/search", h.SearchTraces)
-		api.Post("/diffs", h.ComputeDiff)
-		api.Get("/diffs/{id}", h.GetDiff)
 		api.Post("/projects", h.CreateProject)
 		api.Get("/projects", h.ListProjects)
 		api.Get("/projects/{id}", h.GetProject)
 		api.Post("/projects/{id}/api-keys", h.CreateAPIKey)
 		api.Get("/projects/{id}/api-keys", h.ListAPIKeys)
-		api.Delete("/projects/{id}/api-keys/{keyId}", h.DeleteAPIKey)
-		api.Post("/baselines", h.CreateBaseline)
-		api.Get("/baselines", h.ListBaselines)
-		api.Delete("/baselines/{id}", h.DeleteBaseline)
+
+		api.Group(func(authed chi.Router) {
+			authed.Use(auth.Middleware(h.store))
+			authed.Get("/traces", h.ListTraces)
+			authed.Get("/traces/{id}", h.GetTrace)
+			authed.Get("/traces/{id}/spans", h.GetSpans)
+			authed.Delete("/traces/{id}", h.DeleteTrace)
+			authed.Delete("/traces", h.DeleteTraces)
+			authed.Post("/traces/search", h.SearchTraces)
+			authed.Post("/diffs", h.ComputeDiff)
+			authed.Get("/diffs/{id}", h.GetDiff)
+			authed.Delete("/projects/{id}/api-keys/{keyId}", h.DeleteAPIKey)
+			authed.Post("/baselines", h.CreateBaseline)
+			authed.Get("/baselines", h.ListBaselines)
+			authed.Delete("/baselines/{id}", h.DeleteBaseline)
+			authed.Get("/dashboard", h.GetDashboard)
+			authed.Get("/issues", h.ListIssues)
+			authed.Get("/issues/{id}", h.GetIssue)
+			authed.Patch("/issues/{id}/status", h.UpdateIssueStatus)
+			authed.Get("/metrics", h.ListMetrics)
+			authed.Get("/webhooks", h.ListWebhooks)
+			authed.Post("/webhooks", h.CreateWebhook)
+			authed.Get("/webhooks/{id}", h.GetWebhook)
+			authed.Put("/webhooks/{id}", h.UpdateWebhook)
+			authed.Delete("/webhooks/{id}", h.DeleteWebhook)
+			authed.Get("/webhooks/{id}/deliveries", h.WebhookDeliveryLog)
+		})
 	})
 }
 
@@ -294,7 +308,7 @@ func (h *Handlers) ComputeDiff(w http.ResponseWriter, r *http.Request) {
 		TraceBID:        traceBID,
 		SimilarityScore: &similarityScore,
 		DiffResultJSON:  &diffResultStr,
-		CreatedAt:       time.Now(),
+		CreatedAt:       model.Time{time.Now()},
 	}
 	if err := h.store.DiffPut(r.Context(), diff); err != nil {
 		http.Error(w, "failed to cache diff: "+err.Error(), http.StatusInternalServerError)
@@ -315,7 +329,7 @@ func buildTraceTree(spans []model.Span) map[string]any {
 		}
 
 		node := map[string]any{
-			"spanId":      sp.SpanID,
+			"spanId":       sp.SpanID,
 			"parentSpanId": sp.ParentSpanID,
 			"name":         sp.Name,
 			"spanKind":     sp.SpanKind,
@@ -345,13 +359,13 @@ func buildTraceTree(spans []model.Span) map[string]any {
 		return roots[0]
 	}
 	return map[string]any{
-		"spanId":       "synthetic-root",
-		"name":         "trace",
-		"spanKind":     "root",
-		"attributes":   map[string]string{},
-		"startTime":    0,
-		"endTime":      0,
-		"children":     roots,
+		"spanId":     "synthetic-root",
+		"name":       "trace",
+		"spanKind":   "root",
+		"attributes": map[string]string{},
+		"startTime":  0,
+		"endTime":    0,
+		"children":   roots,
 	}
 }
 
@@ -385,12 +399,12 @@ func computeTraceStats(spans []model.Span) map[string]int64 {
 	}
 
 	return map[string]int64{
-		"totalSpans":       totalSpans,
-		"llmCallCount":     llmCalls,
-		"toolCallCount":    toolCalls,
-		"totalInputTokens": inputTokens,
+		"totalSpans":        totalSpans,
+		"llmCallCount":      llmCalls,
+		"toolCallCount":     toolCalls,
+		"totalInputTokens":  inputTokens,
 		"totalOutputTokens": outputTokens,
-		"totalDurationMs":  totalDuration,
+		"totalDurationMs":   totalDuration,
 	}
 }
 
@@ -449,23 +463,14 @@ func (h *Handlers) GetProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
-	projectID, ok := auth.ProjectIDFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-	keyID := chi.URLParam(r, "id")
-	if keyID != projectID {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
+	projectID := chi.URLParam(r, "id")
 	var req model.APIKeyCreate
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	plainKey := "bx_live_" + generateRandomHex(32)
+	plainKey := "bx_live_" + generateRandomHex(24)
 	keyPrefix := plainKey[:12]
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(plainKey), bcrypt.DefaultCost)
@@ -563,4 +568,222 @@ func (h *Handlers) DeleteBaseline(w http.ResponseWriter, r *http.Request) {
 	baselineID := chi.URLParam(r, "id")
 	_ = h.store.BaselineDelete(r.Context(), baselineID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handlers) GetDashboard(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	stats, err := h.store.DashboardStats(r.Context(), projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tracesByHour, _ := h.store.TracesByHour(r.Context(), projectID, 24)
+	openIssues, _ := h.store.IssueList(r.Context(), projectID, model.IssueStatusOpen)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(model.DashboardResponse{
+		Stats:        stats,
+		TracesByHour: tracesByHour,
+		OpenIssues:   openIssues,
+	})
+}
+
+func (h *Handlers) ListIssues(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var status model.IssueStatus
+	if s := r.URL.Query().Get("status"); s != "" {
+		status = model.IssueStatus(s)
+	}
+	issues, err := h.store.IssueList(r.Context(), projectID, status)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(issues)
+}
+
+func (h *Handlers) GetIssue(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	issueID := chi.URLParam(r, "id")
+	issue, err := h.store.IssueGet(r.Context(), issueID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if issue.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	occurrences, _ := h.store.IssueOccurrenceList(r.Context(), issueID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(struct {
+		model.Issue
+		Occurrences []model.IssueOccurrence `json:"occurrences,omitempty"`
+	}{Issue: issue, Occurrences: occurrences})
+}
+
+func (h *Handlers) UpdateIssueStatus(w http.ResponseWriter, r *http.Request) {
+	_, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	issueID := chi.URLParam(r, "id")
+	var req model.IssueUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	issue, err := h.store.IssueUpdate(r.Context(), issueID, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(issue)
+}
+
+func (h *Handlers) ListMetrics(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	metrics, err := h.store.MetricList(r.Context(), projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	result := make([]model.MetricWithSparkline, len(metrics))
+	for i, m := range metrics {
+		events, _ := h.store.MetricEventsGet(r.Context(), m.ID, 24)
+		sparkline := make([]float64, len(events))
+		for j, e := range events {
+			sparkline[j] = e.Value
+		}
+		result[i] = model.MetricWithSparkline{
+			Metric:       m,
+			CurrentValue: 0,
+			Sparkline:    sparkline,
+		}
+	}
+	json.NewEncoder(w).Encode(result)
+}
+
+func (h *Handlers) ListWebhooks(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	webhooks, err := h.store.WebhookList(r.Context(), projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(webhooks)
+}
+
+func (h *Handlers) CreateWebhook(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req model.WebhookCreate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	req.ProjectID = projectID
+	webhook, err := h.store.WebhookCreate(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(webhook)
+}
+
+func (h *Handlers) GetWebhook(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	webhookID := chi.URLParam(r, "id")
+	webhook, err := h.store.WebhookGet(r.Context(), webhookID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if webhook.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	json.NewEncoder(w).Encode(webhook)
+}
+
+func (h *Handlers) UpdateWebhook(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	webhookID := chi.URLParam(r, "id")
+	existing, err := h.store.WebhookGet(r.Context(), webhookID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if existing.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req model.WebhookUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	webhook, err := h.store.WebhookUpdate(r.Context(), webhookID, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(webhook)
+}
+
+func (h *Handlers) DeleteWebhook(w http.ResponseWriter, r *http.Request) {
+	_, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	webhookID := chi.URLParam(r, "id")
+	if err := h.store.WebhookDelete(r.Context(), webhookID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handlers) WebhookDeliveryLog(w http.ResponseWriter, r *http.Request) {
+	webhookID := chi.URLParam(r, "id")
+	deliveries, err := h.store.WebhookDeliveryLog(r.Context(), webhookID, 50)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(deliveries)
 }

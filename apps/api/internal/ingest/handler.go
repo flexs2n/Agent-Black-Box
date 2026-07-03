@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/blackbox-agentdiff/api/internal/auth"
+	"github.com/blackbox-agentdiff/api/internal/issues"
 	"github.com/blackbox-agentdiff/api/internal/normalize"
 	"github.com/blackbox-agentdiff/api/internal/store"
 )
@@ -118,6 +119,12 @@ func (h *Handler) HTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "stats put failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Trigger issue detection in background goroutine (local mode: in-process)
+	go func() {
+		findings, _ := issues.RunAllEvaluators(r.Context(), trace, spans, stats)
+		_ = issues.ProcessFindings(r.Context(), h.store, projectID, trace.ID, findings)
+	}()
 
 	w.WriteHeader(http.StatusAccepted)
 }

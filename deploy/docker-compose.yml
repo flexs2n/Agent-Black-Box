@@ -6,7 +6,7 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - DATABASE_URL=sqlite:///./data/blackbox.db
+      - DATABASE_URL=/app/data/blackbox.db
       - DUCKDB_PATH=./data/spans.duckdb
       - SECRET_KEY=dev-secret-key-change-me-in-production
       - DIFF_SERVICE_URL=http://diff-service:5001

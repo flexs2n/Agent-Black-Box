@@ -10,9 +10,9 @@ RUN pnpm --filter web run build
 
 FROM node:20-alpine
 WORKDIR /app
-COPY --from=builder /app/apps/web/.next/standalone/. ./
-COPY --from=builder /app/apps/web/.next/static ./.next/static
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 EXPOSE 3000
 ENV PORT=3000
 ENV NODE_ENV=production
-CMD ["node", "server.js"]
+CMD ["node", "apps/web/server.js"]

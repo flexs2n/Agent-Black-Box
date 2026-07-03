@@ -27,30 +27,30 @@ func NewClient(baseURL string) *Client {
 }
 
 type DiffRequest struct {
-	TraceA map[string]any `json:"traceA"`
-	TraceB map[string]any `json:"traceB"`
+	TraceA map[string]any   `json:"traceA"`
+	TraceB map[string]any   `json:"traceB"`
 	StatsA map[string]int64 `json:"statsA"`
 	StatsB map[string]int64 `json:"statsB"`
 }
 
 type DiffResult struct {
-	TraceAID        string  `json:"traceAId"`
-	TraceBID        string  `json:"traceBId"`
-	SimilarityScore float64 `json:"similarityScore"`
-	SpanDiffs       []SpanDiff `json:"spanDiffs"`
+	TraceAID        string      `json:"traceAId"`
+	TraceBID        string      `json:"traceBId"`
+	SimilarityScore float64     `json:"similarityScore"`
+	SpanDiffs       []SpanDiff  `json:"spanDiffs"`
 	MetricDelta     MetricDelta `json:"metricDelta"`
-	CreatedAt       string `json:"createdAt"`
+	CreatedAt       string      `json:"createdAt"`
 }
 
 type SpanDiff struct {
-	Status         string        `json:"status"`
-	SpanAID        string        `json:"spanAId,omitempty"`
-	SpanBID        string        `json:"spanBId,omitempty"`
-	Name           string        `json:"name"`
-	SpanKind       string        `json:"spanKind"`
-	Depth          int           `json:"depth"`
+	Status         string          `json:"status"`
+	SpanAID        string          `json:"spanAId,omitempty"`
+	SpanBID        string          `json:"spanBId,omitempty"`
+	Name           string          `json:"name"`
+	SpanKind       string          `json:"spanKind"`
+	Depth          int             `json:"depth"`
 	AttributeDiffs []AttributeDiff `json:"attributeDiffs,omitempty"`
-	ContentDiff    *ContentDiff  `json:"contentDiff,omitempty"`
+	ContentDiff    *ContentDiff    `json:"contentDiff,omitempty"`
 }
 
 type AttributeDiff struct {
@@ -61,9 +61,9 @@ type AttributeDiff struct {
 }
 
 type ContentDiff struct {
-	Type      string          `json:"type"`
-	WordDiff  []WordDiffChunk `json:"wordDiff,omitempty"`
-	JsonDiff  []JsonDiffNode  `json:"jsonDiff,omitempty"`
+	Type     string          `json:"type"`
+	WordDiff []WordDiffChunk `json:"wordDiff,omitempty"`
+	JsonDiff []JsonDiffNode  `json:"jsonDiff,omitempty"`
 }
 
 type WordDiffChunk struct {
@@ -72,11 +72,11 @@ type WordDiffChunk struct {
 }
 
 type JsonDiffNode struct {
-	key       string      `json:"key"`
-	Type      string      `json:"type"`
-	ValueA    interface{} `json:"valueA,omitempty"`
-	ValueB    interface{} `json:"valueB,omitempty"`
-	Children  []JsonDiffNode `json:"children,omitempty"`
+	key      string         `json:"key"`
+	Type     string         `json:"type"`
+	ValueA   interface{}    `json:"valueA,omitempty"`
+	ValueB   interface{}    `json:"valueB,omitempty"`
+	Children []JsonDiffNode `json:"children,omitempty"`
 }
 
 type MetricDelta struct {
@@ -88,9 +88,9 @@ type MetricDelta struct {
 }
 
 type MetricDeltaItem struct {
-	A           int64   `json:"a"`
-	B           int64   `json:"b"`
-	Delta       int64   `json:"delta"`
+	A            int64   `json:"a"`
+	B            int64   `json:"b"`
+	Delta        int64   `json:"delta"`
 	DeltaPercent float64 `json:"deltaPercent"`
 }
 

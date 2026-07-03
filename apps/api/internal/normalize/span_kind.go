@@ -6,21 +6,21 @@ import (
 )
 
 const (
-	SpanKindGeneration  = "generation"
-	SpanKindTool        = "tool"
-	SpanKindRetrieval   = "retrieval"
-	SpanKindApp         = "app"
-	SpanKindRoot        = "root"
+	SpanKindGeneration = "generation"
+	SpanKindTool       = "tool"
+	SpanKindRetrieval  = "retrieval"
+	SpanKindApp        = "app"
+	SpanKindRoot       = "root"
 )
 
 const (
-	AttrBlackboxSpanKind      = "blackbox.span_kind"
-	AttrGenAIRequestModel     = "gen_ai.request.model"
-	AttrGenAIOperationName    = "gen_ai.operation.name"
-	AttrGenAISystem           = "gen_ai.system"
+	AttrBlackboxSpanKind        = "blackbox.span_kind"
+	AttrGenAIRequestModel       = "gen_ai.request.model"
+	AttrGenAIOperationName      = "gen_ai.operation.name"
+	AttrGenAISystem             = "gen_ai.system"
 	AttrLangfuseObservationType = "langfuse.observation.type"
-	AttrLangfuseSpanType      = "langfuse.span.type"
-	AttrOpenInferenceSpanKind = "openinference.span.kind"
+	AttrLangfuseSpanType        = "langfuse.span.type"
+	AttrOpenInferenceSpanKind   = "openinference.span.kind"
 )
 
 func DeriveSpanKind(attrs map[string]any, depth int, spanName string) string {

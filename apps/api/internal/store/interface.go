@@ -58,4 +58,46 @@ type Store interface {
 	DiffPut(ctx context.Context, d model.Diff) error
 	DiffGet(ctx context.Context, diffID string) (model.Diff, error)
 	DiffGetByTraces(ctx context.Context, projectID, traceAID, traceBID string) (model.Diff, error)
+
+	// Issues
+	IssueCreate(ctx context.Context, issue model.IssueCreate) (model.Issue, error)
+	IssueGet(ctx context.Context, issueID string) (model.Issue, error)
+	IssueList(ctx context.Context, projectID string, status model.IssueStatus) ([]model.Issue, error)
+	IssueUpdate(ctx context.Context, issueID string, update model.IssueUpdate) (model.Issue, error)
+	IssueGetByFingerprint(ctx context.Context, projectID, fingerprint string) (model.Issue, error)
+	IssueOccurrenceCreate(ctx context.Context, occ model.IssueOccurrenceCreate) (model.IssueOccurrence, error)
+	IssueOccurrenceList(ctx context.Context, issueID string) ([]model.IssueOccurrence, error)
+
+	// Metrics
+	MetricCreate(ctx context.Context, metric model.MetricCreate) (model.Metric, error)
+	MetricGet(ctx context.Context, metricID string) (model.Metric, error)
+	MetricList(ctx context.Context, projectID string) ([]model.Metric, error)
+	MetricUpdate(ctx context.Context, metricID string, update model.MetricUpdate) (model.Metric, error)
+	MetricDelete(ctx context.Context, metricID string) error
+	MetricEventsGet(ctx context.Context, metricID string, limit int) ([]model.MetricEvent, error)
+
+	// Monitors
+	MonitorCreate(ctx context.Context, m model.MonitorCreate) (model.Monitor, error)
+	MonitorGet(ctx context.Context, monitorID string) (model.Monitor, error)
+	MonitorList(ctx context.Context, projectID string) ([]model.Monitor, error)
+	MonitorUpdate(ctx context.Context, monitorID string, update model.MonitorUpdate) (model.Monitor, error)
+	MonitorDelete(ctx context.Context, monitorID string) error
+
+	// Incidents
+	IncidentCreate(ctx context.Context, incident model.Incident) (model.Incident, error)
+	IncidentList(ctx context.Context, projectID string) ([]model.Incident, error)
+	IncidentGet(ctx context.Context, incidentID string) (model.Incident, error)
+	IncidentUpdate(ctx context.Context, incidentID string, update model.IncidentUpdate) (model.Incident, error)
+
+	// Webhooks
+	WebhookCreate(ctx context.Context, webhook model.WebhookCreate) (model.Webhook, error)
+	WebhookList(ctx context.Context, projectID string) ([]model.Webhook, error)
+	WebhookGet(ctx context.Context, webhookID string) (model.Webhook, error)
+	WebhookUpdate(ctx context.Context, webhookID string, update model.WebhookUpdate) (model.Webhook, error)
+	WebhookDelete(ctx context.Context, webhookID string) error
+	WebhookDeliveryLog(ctx context.Context, webhookID string, limit int) ([]model.WebhookDelivery, error)
+
+	// Dashboard aggregations
+	DashboardStats(ctx context.Context, projectID string) (model.DashboardStats, error)
+	TracesByHour(ctx context.Context, projectID string, hours int) ([]model.TraceByHour, error)
 }

@@ -1,8 +1,8 @@
 package migrate
 
 import (
-	"embed"
 	"database/sql"
+	"embed"
 	"io/fs"
 	"sort"
 )

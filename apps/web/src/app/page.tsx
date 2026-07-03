@@ -15,8 +15,14 @@ export default function Home() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Links</h2>
           <div className="flex gap-4">
             <Link
-              href="/traces"
+              href="/dashboard"
               className="px-4 py-2 bg-black text-white rounded hover:bg-gray-800"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/traces"
+              className="px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300"
             >
               View Traces
             </Link>

@@ -59,8 +59,8 @@ func NormalizeTrace(rawSpans []RawSpan) ([]model.Span, model.Trace, model.TraceS
 			Name:         rs.Name,
 			SpanKind:     spanKind,
 			Status:       status,
-			StartedAt:    time.Unix(0, rs.StartTimeUnix),
-			EndedAt:      time.Unix(0, rs.EndTimeUnix),
+			StartedAt:    model.Time{time.Unix(0, rs.StartTimeUnix)},
+			EndedAt:      model.Time{time.Unix(0, rs.EndTimeUnix)},
 			DurationMs:   rs.EndTimeUnix - rs.StartTimeUnix,
 			Attributes:   string(attrsJSON),
 		}
@@ -73,8 +73,8 @@ func NormalizeTrace(rawSpans []RawSpan) ([]model.Span, model.Trace, model.TraceS
 	}
 
 	rootSpan := findRootSpan(rawSpans)
-	startedAt := time.Unix(0, rootSpan.StartTimeUnix)
-	endedAt := time.Unix(0, rootSpan.EndTimeUnix)
+	startedAt := model.Time{time.Unix(0, rootSpan.StartTimeUnix)}
+	endedAt := model.Time{time.Unix(0, rootSpan.EndTimeUnix)}
 	durationMs := rootSpan.EndTimeUnix - rootSpan.StartTimeUnix
 
 	runID := getStringValue(rootSpan.ResourceAttrs, "run.id")
@@ -91,21 +91,21 @@ func NormalizeTrace(rawSpans []RawSpan) ([]model.Span, model.Trace, model.TraceS
 	errorMsg := getStringValue(rootSpan.Attributes, "error.message")
 
 	trace := model.Trace{
-		ID:           traceID,
-		ProjectID:    projectID,
-		RunID:        stringPtr(runID),
-		AgentName:    stringPtr(agentName),
-		Status:       inferTraceStatus(rawSpans),
-		ThreadID:     stringPtr(threadID),
-		UserID:       stringPtr(userID),
-		Environment:  environment,
-		Input:        stringPtr(inputJSON),
-		Output:       stringPtr(outputJSON),
-		Error:        stringPtr(errorMsg),
-		StartedAt:    &startedAt,
-		EndedAt:      &endedAt,
-		DurationMs:   &durationMs,
-		CreatedAt:    time.Now(),
+		ID:          traceID,
+		ProjectID:   projectID,
+		RunID:       stringPtr(runID),
+		AgentName:   stringPtr(agentName),
+		Status:      inferTraceStatus(rawSpans),
+		ThreadID:    stringPtr(threadID),
+		UserID:      stringPtr(userID),
+		Environment: environment,
+		Input:       stringPtr(inputJSON),
+		Output:      stringPtr(outputJSON),
+		Error:       stringPtr(errorMsg),
+		StartedAt:   &startedAt,
+		EndedAt:     &endedAt,
+		DurationMs:  &durationMs,
+		CreatedAt:   model.Time{time.Now()},
 	}
 
 	spans := make([]model.Span, 0, len(spanMap))
@@ -170,15 +170,15 @@ func inferTraceStatus(rawSpans []RawSpan) string {
 
 func computeTraceStats(spans []model.Span, traceID, projectID string) model.TraceStats {
 	stats := model.TraceStats{
-		TraceID:       traceID,
-		ProjectID:     projectID,
-		TotalSpans:    int16(len(spans)),
-		LLMCallCount:  0,
-		ToolCallCount: 0,
+		TraceID:           traceID,
+		ProjectID:         projectID,
+		TotalSpans:        int16(len(spans)),
+		LLMCallCount:      0,
+		ToolCallCount:     0,
 		TotalInputTokens:  0,
 		TotalOutputTokens: 0,
 		TotalTokens:       0,
-		CreatedAt:     time.Now(),
+		CreatedAt:         model.Time{time.Now()},
 	}
 
 	for _, sp := range spans {

@@ -42,9 +42,12 @@ func createProjectAndKey(t *testing.T, st *store.SQLiteStore) (string, string) {
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	plainKey := "bx_live_" + uuid.New().String() + uuid.New().String()
+	plainKey := "bx_live_" + uuid.New().String()[:24]
 	keyPrefix := plainKey[:12]
-	hash, _ := bcrypt.GenerateFromPassword([]byte(plainKey), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(plainKey), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("bcrypt generate: %v", err)
+	}
 	_, err = st.APIKeyCreate(ctx, project.ID, "k", string(hash), keyPrefix)
 	if err != nil {
 		t.Fatalf("create api key: %v", err)
@@ -93,9 +96,12 @@ func TestStore_APIKeyLookup(t *testing.T) {
 		t.Fatalf("create project: %v", err)
 	}
 
-	plainKey := "bx_live_" + uuid.New().String() + uuid.New().String()
+	plainKey := "bx_live_" + uuid.New().String()[:24]
 	keyPrefix := plainKey[:12]
-	hash, _ := bcrypt.GenerateFromPassword([]byte(plainKey), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(plainKey), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("bcrypt generate: %v", err)
+	}
 
 	_, err = st.APIKeyCreate(ctx, project.ID, "k", string(hash), keyPrefix)
 	if err != nil {
@@ -108,6 +114,9 @@ func TestStore_APIKeyLookup(t *testing.T) {
 	}
 	if found.ProjectID != project.ID {
 		t.Fatalf("expected project %s, got %s", project.ID, found.ProjectID)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(found.KeyHash), []byte(plainKey)); err != nil {
+		t.Fatalf("bcrypt verify failed: %v", err)
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(found.KeyHash), []byte(plainKey)); err != nil {
 		t.Fatalf("bcrypt verify failed: %v", err)
@@ -128,7 +137,7 @@ func TestStore_IngestAndQueryTrace(t *testing.T) {
 
 	traceID := uuid.New().String()
 	spanID := uuid.New().String()[:16]
-	now := time.Now()
+	now := model.Time{time.Now()}
 
 	trace := model.Trace{
 		ID:          traceID,
@@ -168,10 +177,10 @@ func TestStore_IngestAndQueryTrace(t *testing.T) {
 	}
 
 	stats := model.TraceStats{
-		TraceID:   traceID,
-		ProjectID: project.ID,
+		TraceID:    traceID,
+		ProjectID:  project.ID,
 		TotalSpans: 1,
-		CreatedAt: now,
+		CreatedAt:  now,
 	}
 	if err := st.TraceStatsPut(ctx, stats); err != nil {
 		t.Fatalf("stats put: %v", err)
@@ -243,7 +252,7 @@ func TestStore_BaselineAndDiff(t *testing.T) {
 		TraceBID:        uuid.New().String(),
 		SimilarityScore: &score,
 		DiffResultJSON:  stringPtr(`{"test":true}`),
-		CreatedAt:       time.Now(),
+		CreatedAt:       model.Time{time.Now()},
 	}
 	if err := st.DiffPut(ctx, diff); err != nil {
 		t.Fatalf("diff put: %v", err)

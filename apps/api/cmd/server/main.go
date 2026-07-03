@@ -71,11 +71,11 @@ func main() {
 	handlers.Register(r)
 
 	srv := &http.Server{
-		Addr:           ":4000",
-		Handler:        r,
-		ReadTimeout:    30 * time.Second,
-		WriteTimeout:   30 * time.Second,
-		IdleTimeout:    120 * time.Second,
+		Addr:         ":4000",
+		Handler:      r,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
 	}
 
 	log.Println("api listening on :4000")
