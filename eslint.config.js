@@ -3,6 +3,38 @@ const tsParser = require('@typescript-eslint/parser');
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const prettierConfig = require('eslint-config-prettier');
 
+const browserGlobals = {
+  window: 'readonly',
+  document: 'readonly',
+  localStorage: 'readonly',
+  sessionStorage: 'readonly',
+  console: 'readonly',
+  alert: 'readonly',
+  confirm: 'readonly',
+  fetch: 'readonly',
+  navigator: 'readonly',
+  location: 'readonly',
+  history: 'readonly',
+  HTMLElement: 'readonly',
+  Event: 'readonly',
+  MouseEvent: 'readonly',
+  KeyboardEvent: 'readonly',
+  setTimeout: 'readonly',
+  clearTimeout: 'readonly',
+  setInterval: 'readonly',
+  clearInterval: 'readonly',
+};
+
+const nodeGlobals = {
+  process: 'readonly',
+  module: 'readonly',
+  require: 'readonly',
+  __dirname: 'readonly',
+  __filename: 'readonly',
+  Buffer: 'readonly',
+  global: 'readonly',
+};
+
 module.exports = [
   js.configs.recommended,
   {
@@ -16,6 +48,11 @@ module.exports = [
         ecmaVersion: 'latest',
         sourceType: 'module',
         project: './tsconfig.json',
+      },
+      globals: {
+        ...browserGlobals,
+        ...nodeGlobals,
+        React: 'readonly',
       },
     },
     plugins: {

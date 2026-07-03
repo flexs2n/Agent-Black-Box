@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { api, Issue } from '@/lib/api';
+import { api, Issue, IssueStatus } from '@/lib/api';
 
 export default function IssuesPage() {
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -184,17 +184,18 @@ export default function IssuesPage() {
                     value={selectedIssue.status}
                     onChange={(e) => {
                       if (apiKey) {
+                        const newStatus = e.target.value as IssueStatus;
                         api
-                          .updateIssueStatus(selectedIssue.id, e.target.value as any, apiKey)
+                          .updateIssueStatus(selectedIssue.id, newStatus, apiKey)
                           .then(() => {
                             setIssues(
                               issues.map((i) =>
                                 i.id === selectedIssue.id
-                                  ? { ...i, status: e.target.value as any }
+                                  ? { ...i, status: newStatus }
                                   : i
                               )
                             );
-                            setSelectedIssue({ ...selectedIssue, status: e.target.value as any });
+                            setSelectedIssue({ ...selectedIssue, status: newStatus });
                           });
                       }
                     }}

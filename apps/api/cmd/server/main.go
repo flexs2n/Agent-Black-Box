@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -22,7 +23,12 @@ import (
 func main() {
 	cfg := config.Load()
 
-	sqlDB, err := sql.Open("sqlite", cfg.DatabaseURL)
+	// Normalize DATABASE_URL: strip sqlite:// prefix if present so plain
+	// file paths work with modernc.org/sqlite driver
+	dbURL := cfg.DatabaseURL
+	dbURL = strings.TrimPrefix(dbURL, "sqlite://")
+
+	sqlDB, err := sql.Open("sqlite", dbURL)
 	if err != nil {
 		log.Fatalf("open sqlite: %v", err)
 	}
@@ -32,7 +38,7 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	st, err := store.NewSQLiteStore(cfg.DatabaseURL)
+	st, err := store.NewSQLiteStore(dbURL)
 	if err != nil {
 		log.Fatalf("open store: %v", err)
 	}

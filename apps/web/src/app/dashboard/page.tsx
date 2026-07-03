@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { api, DashboardResponse, Issue } from '@/lib/api';
+import { api, DashboardResponse } from '@/lib/api';
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardResponse | null>(null);

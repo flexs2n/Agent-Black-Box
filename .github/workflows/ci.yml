@@ -108,7 +108,8 @@ jobs:
       - run: cd apps/api && go build ./cmd/server
       - run: |
           cd apps/api
-          DATABASE_URL="sqlite:///./data/test.db" \
+          mkdir -p data
+          DATABASE_URL="./data/test.db" \
           DUCKDB_PATH="./data/test.duckdb" \
           SECRET_KEY="test-secret-key" \
           DIFF_SERVICE_URL="http://localhost:5001" \
