@@ -1,9 +1,15 @@
 package issues
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/blackbox-agentdiff/api/internal/model"
 	"github.com/blackbox-agentdiff/api/internal/store"
@@ -22,6 +28,7 @@ const (
 	EvaluatorRepeatedToolCall     Evaluator = "repeated_tool_call"
 	EvaluatorEmptyLLMOutput       Evaluator = "empty_llm_output"
 	EvaluatorOutputFormatMismatch Evaluator = "output_format_mismatch"
+	EvaluatorHallucination        Evaluator = "hallucination"
 )
 
 const (
@@ -182,14 +189,173 @@ func EmptyLLMOutput(ctx context.Context, trace model.Trace, spans []model.Span, 
 	return findings, nil
 }
 
+func OutputFormatMismatch(ctx context.Context, trace model.Trace, spans []model.Span, stats model.TraceStats) ([]IssueFinding, error) {
+	var findings []IssueFinding
+	for _, sp := range spans {
+		if sp.SpanKind != "generation" {
+			continue
+		}
+		var attrs map[string]interface{}
+		if sp.Attributes != "" {
+			json.Unmarshal([]byte(sp.Attributes), &attrs)
+		}
+		prompt, _ := attrs["gen_ai.prompt"].(string)
+		completion, _ := attrs["gen_ai.completion"].(string)
+		if prompt == "" || completion == "" {
+			continue
+		}
+
+		lower := strings.ToLower(prompt)
+		expectsJSON := strings.Contains(lower, "json") || strings.Contains(lower, "return a") || strings.Contains(lower, "format:")
+		if !expectsJSON {
+			continue
+		}
+
+		trimmed := strings.TrimSpace(completion)
+		if !strings.HasPrefix(trimmed, "{") && !strings.HasPrefix(trimmed, "[") {
+			findings = append(findings, IssueFinding{
+				Evaluator: EvaluatorOutputFormatMismatch,
+				Severity:  model.IssueSeverityMedium,
+				Title:     fmt.Sprintf("LLM output format mismatch: expected JSON but got non-JSON response"),
+				Evidence: map[string]interface{}{
+					"span_id":      sp.SpanID,
+					"span_name":    sp.Name,
+					"output_start": trimmed[:min(len(trimmed), 100)],
+				},
+			})
+			continue
+		}
+
+		var parsed interface{}
+		if err := json.Unmarshal([]byte(trimmed), &parsed); err != nil {
+			findings = append(findings, IssueFinding{
+				Evaluator: EvaluatorOutputFormatMismatch,
+				Severity:  model.IssueSeverityMedium,
+				Title:     "LLM output format mismatch: invalid JSON",
+				Evidence: map[string]interface{}{
+					"span_id":   sp.SpanID,
+					"span_name": sp.Name,
+					"error":     err.Error(),
+				},
+			})
+		}
+	}
+	return findings, nil
+}
+
+func Hallucination(ctx context.Context, trace model.Trace, spans []model.Span, stats model.TraceStats) ([]IssueFinding, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, nil
+	}
+
+	var findings []IssueFinding
+	for _, sp := range spans {
+		if sp.SpanKind != "generation" {
+			continue
+		}
+		var attrs map[string]interface{}
+		if sp.Attributes != "" {
+			json.Unmarshal([]byte(sp.Attributes), &attrs)
+		}
+		prompt, _ := attrs["gen_ai.prompt"].(string)
+		completion, _ := attrs["gen_ai.completion"].(string)
+		if prompt == "" || completion == "" {
+			continue
+		}
+
+		body := map[string]interface{}{
+			"model": "gpt-4o-mini",
+			"messages": []map[string]string{
+				{"role": "system", "content": "You are an evaluator. Determine if the following assistant response contains hallucinations (statements not supported by the given context or prompt). Reply with a JSON object: {\"has_hallucination\": bool, \"reason\": \"...\", \"severity\": \"low|medium|high\"}. Only output JSON."},
+				{"role": "user", "content": fmt.Sprintf("Prompt/Context: %s\n\nAssistant Response: %s", prompt[:min(len(prompt), 2000)], completion[:min(len(completion), 2000)])},
+			},
+			"temperature": 0,
+			"max_tokens":  256,
+		}
+		bodyBytes, _ := json.Marshal(body)
+
+		req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(bodyBytes))
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{Timeout: 15 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			continue
+		}
+
+		var chatResp struct {
+			Choices []struct {
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			} `json:"choices"`
+		}
+		if err := json.Unmarshal(respBody, &chatResp); err != nil || len(chatResp.Choices) == 0 {
+			continue
+		}
+
+		var judgment struct {
+			HasHallucination bool   `json:"has_hallucination"`
+			Reason           string `json:"reason"`
+			Severity         string `json:"severity"`
+		}
+		if err := json.Unmarshal([]byte(chatResp.Choices[0].Message.Content), &judgment); err != nil {
+			continue
+		}
+
+		if judgment.HasHallucination {
+			var sev model.IssueSeverity
+			switch judgment.Severity {
+			case "high":
+				sev = model.IssueSeverityHigh
+			case "medium":
+				sev = model.IssueSeverityMedium
+			default:
+				sev = model.IssueSeverityLow
+			}
+			findings = append(findings, IssueFinding{
+				Evaluator: EvaluatorHallucination,
+				Severity:  sev,
+				Title:     "Potential hallucination detected",
+				Evidence: map[string]interface{}{
+					"span_id":   sp.SpanID,
+					"span_name": sp.Name,
+					"reason":    judgment.Reason,
+				},
+			})
+		}
+	}
+	return findings, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 var BuiltinEvaluators = map[Evaluator]EvaluatorFunc{
-	EvaluatorEmptyToolResult:  EmptyToolResult,
-	EvaluatorToolCallError:    ToolCallError,
-	EvaluatorLLMError:         LLMError,
-	EvaluatorTokenBudget:      TokenBudget,
-	EvaluatorSlowTrace:        SlowTrace,
-	EvaluatorRepeatedToolCall: RepeatedToolCall,
-	EvaluatorEmptyLLMOutput:   EmptyLLMOutput,
+	EvaluatorEmptyToolResult:      EmptyToolResult,
+	EvaluatorToolCallError:        ToolCallError,
+	EvaluatorLLMError:             LLMError,
+	EvaluatorTokenBudget:          TokenBudget,
+	EvaluatorSlowTrace:            SlowTrace,
+	EvaluatorRepeatedToolCall:     RepeatedToolCall,
+	EvaluatorEmptyLLMOutput:       EmptyLLMOutput,
+	EvaluatorOutputFormatMismatch: OutputFormatMismatch,
+	EvaluatorHallucination:        Hallucination,
 }
 
 func RunAllEvaluators(ctx context.Context, trace model.Trace, spans []model.Span, stats model.TraceStats) ([]IssueFinding, error) {

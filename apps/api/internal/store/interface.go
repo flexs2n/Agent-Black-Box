@@ -82,12 +82,14 @@ type Store interface {
 	MonitorList(ctx context.Context, projectID string) ([]model.Monitor, error)
 	MonitorUpdate(ctx context.Context, monitorID string, update model.MonitorUpdate) (model.Monitor, error)
 	MonitorDelete(ctx context.Context, monitorID string) error
+	MonitorSetFired(ctx context.Context, monitorID string, status model.MonitorStatus, firedAt model.Time) error
 
 	// Incidents
 	IncidentCreate(ctx context.Context, incident model.Incident) (model.Incident, error)
 	IncidentList(ctx context.Context, projectID string) ([]model.Incident, error)
 	IncidentGet(ctx context.Context, incidentID string) (model.Incident, error)
 	IncidentUpdate(ctx context.Context, incidentID string, update model.IncidentUpdate) (model.Incident, error)
+	IncidentListByMonitor(ctx context.Context, monitorID string) ([]model.Incident, error)
 
 	// Webhooks
 	WebhookCreate(ctx context.Context, webhook model.WebhookCreate) (model.Webhook, error)
@@ -100,6 +102,9 @@ type Store interface {
 	// Dashboard aggregations
 	DashboardStats(ctx context.Context, projectID string) (model.DashboardStats, error)
 	TracesByHour(ctx context.Context, projectID string, hours int) ([]model.TraceByHour, error)
+
+	// Threads
+	ThreadList(ctx context.Context, projectID string) ([]model.ThreadSummary, error)
 
 	// Preset metrics
 	PresetMetrics(ctx context.Context, projectID string, windowSecs int) ([]model.PresetMetric, error)

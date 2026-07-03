@@ -1,0 +1,74 @@
+name: Agent Regression
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      baseline-label:
+        description: 'Baseline label'
+        required: false
+        default: 'main'
+      min-similarity:
+        description: 'Minimum similarity score (0-100)'
+        required: false
+        default: '80'
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9.6.0'
+
+jobs:
+  regression:
+    name: Regression Test
+    runs-on: ubuntu-latest
+    services:
+      api:
+        image: blackbox-agentdiff-api:latest
+        ports:
+          - 4000:4000
+        env:
+          SECRET_KEY: test-secret-key
+          DATABASE_URL: /data/test.db
+        options: >-
+          --health-cmd "curl -f http://localhost:4000/healthz"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run agent test
+        run: |
+          # Create a test trace via the SDK
+          cd packages/sdk-typescript
+          npx tsx src/test.ts 2>&1 || true
+        env:
+          BLACKBOX_BASE_URL: http://localhost:4000
+          BLACKBOX_API_KEY: ${{ secrets.BLACKBOX_API_KEY }}
+
+      - name: Assert similarity vs baseline
+        uses: ./.github/actions/agent-regression
+        with:
+          api-key: ${{ secrets.BLACKBOX_API_KEY }}
+          project-id: ${{ secrets.BLACKBOX_PROJECT_ID }}
+          baseline-label: ${{ github.event.inputs.baseline-label || 'main' }}
+          min-similarity: ${{ github.event.inputs.min-similarity || '80' }}
+          base-url: http://localhost:4000
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

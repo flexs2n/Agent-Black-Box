@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"github.com/blackbox-agentdiff/api/internal/diffproxy"
 	"github.com/blackbox-agentdiff/api/internal/ingest"
 	"github.com/blackbox-agentdiff/api/internal/migrate"
+	"github.com/blackbox-agentdiff/api/internal/monitors"
 	"github.com/blackbox-agentdiff/api/internal/rest"
 	"github.com/blackbox-agentdiff/api/internal/store"
 	"github.com/blackbox-agentdiff/api/internal/webhook"
@@ -77,6 +79,10 @@ func main() {
 
 	handlers := rest.New(st, diffClient, dispatcher)
 	handlers.Register(r)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go monitors.StartWorker(ctx, st, dispatcher, cfg.MonitorInterval)
 
 	srv := &http.Server{
 		Addr:         ":4000",

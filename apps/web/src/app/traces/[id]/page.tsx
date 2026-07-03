@@ -39,7 +39,10 @@ export default function TraceDetailPage({ params }: { params: { id: string } }) 
         <div className="flex items-center gap-6">
           <Link href="/" className="text-xl font-bold text-gray-900">Blackbox</Link>
           <Link href="/traces" className="text-sm font-medium text-gray-500 hover:text-gray-900">Traces</Link>
+          <Link href="/traces/threads" className="text-sm font-medium text-gray-500 hover:text-gray-900">Threads</Link>
           <Link href="/diff" className="text-sm font-medium text-gray-500 hover:text-gray-900">Diff</Link>
+          <Link href="/issues" className="text-sm font-medium text-gray-500 hover:text-gray-900">Issues</Link>
+          <Link href="/metrics" className="text-sm font-medium text-gray-500 hover:text-gray-900">Metrics</Link>
           <Link href="/settings" className="text-sm font-medium text-gray-500 hover:text-gray-900">Settings</Link>
         </div>
       </nav>

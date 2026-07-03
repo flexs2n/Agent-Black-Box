@@ -65,6 +65,30 @@ async function listTraces(limit: number) {
   }
 }
 
+async function computeBatchDiff(referenceTraceId: string, compareIds: string[], format: string) {
+  const result = await request("/api/v1/diffs/batch", {
+    method: "POST",
+    body: JSON.stringify({ reference_trace_id: referenceTraceId, compare_trace_ids: compareIds }),
+  });
+  if (format === "json") {
+    console.log(JSON.stringify(result, null, 2));
+  } else {
+    console.log(`Reference: ${referenceTraceId}`);
+    console.log(`Comparisons: ${result.comparisons?.length || 0}`);
+    console.log(`\nVariance Report:`);
+    const v = result.variance || {};
+    for (const [key, stats] of Object.entries(v)) {
+      console.log(`  ${key}: mean=${(stats as any).mean}, stdDev=${(stats as any).stdDev}, range=[${(stats as any).min}, ${(stats as any).max}]`);
+    }
+    if (result.outliers?.length > 0) {
+      console.log(`\nOutliers:`);
+      for (const o of result.outliers) {
+        console.log(`  ${o.traceId}: similarity=${o.similarityScore}, z-score=${o.zScore}`);
+      }
+    }
+  }
+}
+
 async function computeDiff(traceA: string, traceB: string, format: string) {
   const result = await request("/api/v1/diffs", {
     method: "POST",
@@ -121,6 +145,7 @@ async function main() {
     }
     console.error("Usage: blackbox diff <traceA> <traceB> [--output json|text]");
     console.error("       blackbox diff --trace <id> --baseline <label>");
+    console.error("       blackbox diff-batch <reference-trace-id> <compare-trace-id>... [--output json|text]");
     console.error("       blackbox assert --baseline <label> --min-similarity <N>");
     console.error("       blackbox list-traces [--limit N]");
     process.exit(1);
@@ -137,6 +162,16 @@ async function main() {
         console.error("Usage: blackbox diff <traceA> <traceB> [--output json|text]");
         process.exit(1);
       }
+      break;
+    }
+    case "diff-batch": {
+      const refId = args._[1] || args.trace;
+      const compareIds = args._.slice(2);
+      if (!refId || compareIds.length === 0) {
+        console.error("Usage: blackbox diff-batch <reference-trace-id> <compare-trace-id>... [--output json|text]");
+        process.exit(1);
+      }
+      await computeBatchDiff(refId, compareIds, args.output || "text");
       break;
     }
     case "assert": {

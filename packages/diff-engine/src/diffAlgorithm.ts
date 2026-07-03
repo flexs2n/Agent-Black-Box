@@ -231,6 +231,90 @@ export function computeMetricDelta(
   };
 }
 
+export interface BatchDiffResult {
+  referenceTraceId: string;
+  comparisons: {
+    traceId: string;
+    similarityScore: number;
+    metricDelta: MetricDelta;
+    spanDiffCount: number;
+  }[];
+  variance: {
+    similarityScore: { mean: number; stdDev: number; min: number; max: number };
+    durationMs: { mean: number; stdDev: number; min: number; max: number };
+    inputTokens: { mean: number; stdDev: number; min: number; max: number };
+    outputTokens: { mean: number; stdDev: number; min: number; max: number };
+    toolCallCount: { mean: number; stdDev: number; min: number; max: number };
+    llmCallCount: { mean: number; stdDev: number; min: number; max: number };
+  };
+  outliers: { traceId: string; similarityScore: number; zScore: number }[];
+}
+
+function meanStdDev(values: number[]): { mean: number; stdDev: number; min: number; max: number } {
+  if (values.length === 0) return { mean: 0, stdDev: 0, min: 0, max: 0 };
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
+  return {
+    mean: Math.round(mean * 100) / 100,
+    stdDev: Math.round(Math.sqrt(variance) * 100) / 100,
+    min: Math.min(...values),
+    max: Math.max(...values),
+  };
+}
+
+export function computeBatchDiff(
+  refSpans: SpanNode[],
+  refStats: { totalSpans: number; llmCallCount: number; toolCallCount: number; totalInputTokens: number; totalOutputTokens: number; totalDurationMs: number },
+  compareSets: { traceId: string; spans: SpanNode[]; stats: { totalSpans: number; llmCallCount: number; toolCallCount: number; totalInputTokens: number; totalOutputTokens: number; totalDurationMs: number } }[]
+): BatchDiffResult {
+  const comparisons: BatchDiffResult["comparisons"] = [];
+  const similarityScores: number[] = [];
+  const durationDeltas: number[] = [];
+  const inputTokenDeltas: number[] = [];
+  const outputTokenDeltas: number[] = [];
+  const toolCallDeltas: number[] = [];
+  const llmCallDeltas: number[] = [];
+
+  for (const cs of compareSets) {
+    const result = computeDiff(refSpans, cs.spans, refStats, cs.stats);
+    comparisons.push({
+      traceId: cs.traceId,
+      similarityScore: result.similarityScore,
+      metricDelta: result.metricDelta,
+      spanDiffCount: result.spanDiffs.filter(d => d.status !== "unchanged").length,
+    });
+    similarityScores.push(result.similarityScore);
+    durationDeltas.push(result.metricDelta.durationMs.delta);
+    inputTokenDeltas.push(result.metricDelta.inputTokens.delta);
+    outputTokenDeltas.push(result.metricDelta.outputTokens.delta);
+    toolCallDeltas.push(result.metricDelta.toolCallCount.delta);
+    llmCallDeltas.push(result.metricDelta.llmCallCount.delta);
+  }
+
+  const simStats = meanStdDev(similarityScores);
+  const outliers = comparisons
+    .map((c, i) => {
+      const zScore = simStats.stdDev > 0 ? Math.abs((c.similarityScore - simStats.mean) / simStats.stdDev) : 0;
+      return { traceId: c.traceId, similarityScore: c.similarityScore, zScore: Math.round(zScore * 100) / 100 };
+    })
+    .filter(o => o.zScore > 1.5)
+    .sort((a, b) => b.zScore - a.zScore);
+
+  return {
+    referenceTraceId: refSpans[0]?.spanId ?? "",
+    comparisons,
+    variance: {
+      similarityScore: simStats,
+      durationMs: meanStdDev(durationDeltas),
+      inputTokens: meanStdDev(inputTokenDeltas),
+      outputTokens: meanStdDev(outputTokenDeltas),
+      toolCallCount: meanStdDev(toolCallDeltas),
+      llmCallCount: meanStdDev(llmCallDeltas),
+    },
+    outliers,
+  };
+}
+
 export function computeDiff(
   aSpans: SpanNode[],
   bSpans: SpanNode[],

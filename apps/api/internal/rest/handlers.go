@@ -47,6 +47,7 @@ func (h *Handlers) Register(r chi.Router) {
 			authed.Delete("/traces", h.DeleteTraces)
 			authed.Post("/traces/search", h.SearchTraces)
 			authed.Post("/diffs", h.ComputeDiff)
+			authed.Post("/diffs/batch", h.ComputeBatchDiff)
 			authed.Get("/diffs/{id}", h.GetDiff)
 			authed.Delete("/projects/{id}/api-keys/{keyId}", h.DeleteAPIKey)
 			authed.Post("/baselines", h.CreateBaseline)
@@ -63,6 +64,18 @@ func (h *Handlers) Register(r chi.Router) {
 			authed.Put("/webhooks/{id}", h.UpdateWebhook)
 			authed.Delete("/webhooks/{id}", h.DeleteWebhook)
 			authed.Get("/webhooks/{id}/deliveries", h.WebhookDeliveryLog)
+
+			authed.Get("/threads", h.ListThreads)
+
+			authed.Get("/monitors", h.ListMonitors)
+			authed.Post("/monitors", h.CreateMonitor)
+			authed.Put("/monitors/{id}", h.UpdateMonitor)
+			authed.Delete("/monitors/{id}", h.DeleteMonitor)
+			authed.Get("/monitors/{id}/history", h.MonitorHistory)
+
+			authed.Get("/incidents", h.ListIncidents)
+			authed.Get("/incidents/{id}", h.GetIncident)
+			authed.Patch("/incidents/{id}/status", h.UpdateIncidentStatus)
 		})
 	})
 }
@@ -318,6 +331,78 @@ func (h *Handlers) ComputeDiff(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(diffResult)
+}
+
+func (h *Handlers) ComputeBatchDiff(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		ReferenceTraceID string   `json:"reference_trace_id"`
+		CompareTraceIDs  []string `json:"compare_trace_ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.ReferenceTraceID == "" || len(req.CompareTraceIDs) == 0 {
+		http.Error(w, "reference_trace_id and compare_trace_ids required", http.StatusBadRequest)
+		return
+	}
+
+	refTrace, err := h.store.TraceGet(r.Context(), req.ReferenceTraceID)
+	if err != nil {
+		http.Error(w, "reference trace not found", http.StatusNotFound)
+		return
+	}
+	if refTrace.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	refSpans, err := h.store.SpanList(r.Context(), req.ReferenceTraceID)
+	if err != nil {
+		http.Error(w, "failed to load reference spans", http.StatusInternalServerError)
+		return
+	}
+	refTree := buildTraceTree(refSpans)
+	refStats := computeTraceStats(refSpans)
+
+	var comparisons []diffproxy.BatchCompareItem
+	for _, cid := range req.CompareTraceIDs {
+		trace, err := h.store.TraceGet(r.Context(), cid)
+		if err != nil {
+			continue
+		}
+		if trace.ProjectID != projectID {
+			continue
+		}
+		spans, err := h.store.SpanList(r.Context(), cid)
+		if err != nil {
+			continue
+		}
+		comparisons = append(comparisons, diffproxy.BatchCompareItem{
+			TraceID: cid,
+			Trace:   buildTraceTree(spans),
+			Stats:   computeTraceStats(spans),
+		})
+	}
+
+	batchReq := diffproxy.BatchDiffRequest{
+		ReferenceTrace: refTree,
+		ReferenceStats: refStats,
+		Comparisons:    comparisons,
+	}
+
+	result, err := h.diffClient.ComputeBatch(r.Context(), batchReq)
+	if err != nil {
+		http.Error(w, "batch diff computation failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(result)
 }
 
 func buildTraceTree(spans []model.Span) map[string]any {
@@ -792,4 +877,222 @@ func (h *Handlers) WebhookDeliveryLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(deliveries)
+}
+
+func (h *Handlers) ListThreads(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	threads, err := h.store.ThreadList(r.Context(), projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(threads)
+}
+
+// Monitors
+
+func (h *Handlers) ListMonitors(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	monitors, err := h.store.MonitorList(r.Context(), projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(monitors)
+}
+
+func (h *Handlers) CreateMonitor(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req model.MonitorCreate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	req.ProjectID = projectID
+	monitor, err := h.store.MonitorCreate(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(monitor)
+}
+
+func (h *Handlers) UpdateMonitor(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	monitorID := chi.URLParam(r, "id")
+	existing, err := h.store.MonitorGet(r.Context(), monitorID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if existing.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req model.MonitorUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	monitor, err := h.store.MonitorUpdate(r.Context(), monitorID, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(monitor)
+}
+
+func (h *Handlers) DeleteMonitor(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	monitorID := chi.URLParam(r, "id")
+	existing, err := h.store.MonitorGet(r.Context(), monitorID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if existing.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if err := h.store.MonitorDelete(r.Context(), monitorID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handlers) MonitorHistory(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	monitorID := chi.URLParam(r, "id")
+	existing, err := h.store.MonitorGet(r.Context(), monitorID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if existing.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	incidents, err := h.store.IncidentListByMonitor(r.Context(), monitorID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(incidents)
+}
+
+// Incidents
+
+func (h *Handlers) ListIncidents(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	incidents, err := h.store.IncidentList(r.Context(), projectID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(incidents)
+}
+
+func (h *Handlers) GetIncident(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	incidentID := chi.URLParam(r, "id")
+	incident, err := h.store.IncidentGet(r.Context(), incidentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if incident.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	json.NewEncoder(w).Encode(incident)
+}
+
+func (h *Handlers) UpdateIncidentStatus(w http.ResponseWriter, r *http.Request) {
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	incidentID := chi.URLParam(r, "id")
+	existing, err := h.store.IncidentGet(r.Context(), incidentID)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if existing.ProjectID != projectID {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req model.IncidentUpdate
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.Status != nil && (*req.Status == model.IncidentStatusResolved || *req.Status == model.IncidentStatusDismissed) {
+		now := model.Time{time.Now()}
+		req.ResolvedAt = &now
+	}
+	_, err = h.store.IncidentUpdate(r.Context(), incidentID, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	incident, err := h.store.IncidentGet(r.Context(), incidentID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if req.Status != nil {
+		var eventType string
+		switch *req.Status {
+		case model.IncidentStatusResolved:
+			eventType = "incident.resolved"
+		case model.IncidentStatusDismissed:
+			eventType = "incident.dismissed"
+		default:
+			eventType = "incident.updated"
+		}
+		if h.dispatcher != nil {
+			h.dispatcher.Dispatch(r.Context(), projectID, eventType, incident)
+		}
+	}
+
+	json.NewEncoder(w).Encode(incident)
 }

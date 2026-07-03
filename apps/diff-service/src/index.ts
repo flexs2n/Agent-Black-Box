@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { computeDiff, computeMetricDelta, normalizeTree } from '@blackbox/diff-engine';
+import { computeDiff, computeMetricDelta, computeBatchDiff, normalizeTree } from '@blackbox/diff-engine';
 
 type BEnv = {
   Variables: {
@@ -92,6 +92,54 @@ app.post('/internal/diff', async (c) => {
   } catch (err: any) {
     console.error('/internal/diff failed:', err);
     return c.json({ error: 'Invalid request', message: err.message }, 400);
+  }
+});
+
+app.post('/internal/diffs/batch', async (c) => {
+  try {
+    const body = await c.req.json();
+    const refTrace = body.referenceTrace as any;
+    const comparisons = body.comparisons as Array<{ traceId: string; trace: any; stats: any }>;
+
+    const makeNorm = (node: any, depth = 0, parentId?: string) => ({
+      spanId: node.spanId ?? 'unknown',
+      parentSpanId: parentId,
+      name: node.name ?? 'unknown',
+      spanKind: node.spanKind ?? node.name ?? 'app',
+      attributes: node.attributes ?? {},
+      startTime: node.startTime ?? 0,
+      endTime: node.endTime ?? 0,
+      depth,
+      children: (node.children ?? []).map((child: any) => makeNorm(child, depth + 1, node.spanId)),
+    });
+
+    const flattenTree = (node: any): any[] => {
+      const result = [node];
+      for (const child of node.children ?? []) {
+        result.push(...flattenTree(child));
+      }
+      return result;
+    };
+
+    const refNorm = makeNorm(refTrace);
+    const refSpans = flattenTree(refNorm);
+    const refStats = body.referenceStats ?? { totalSpans: refSpans.length, llmCallCount: 0, toolCallCount: 0, totalInputTokens: 0, totalOutputTokens: 0, totalDurationMs: 0 };
+
+    const compareSets = comparisons.map((c: any) => {
+      const norm = makeNorm(c.trace);
+      const spans = flattenTree(norm);
+      return {
+        traceId: c.traceId,
+        spans,
+        stats: c.stats ?? { totalSpans: spans.length, llmCallCount: 0, toolCallCount: 0, totalInputTokens: 0, totalOutputTokens: 0, totalDurationMs: 0 },
+      };
+    });
+
+    const result = computeBatchDiff(refSpans, refStats, compareSets);
+    return c.json(result);
+  } catch (err: any) {
+    console.error('/internal/diffs/batch failed:', err);
+    return c.json({ error: 'Batch diff failed', message: err.message }, 400);
   }
 });
 

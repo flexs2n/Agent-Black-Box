@@ -94,6 +94,45 @@ type MetricDeltaItem struct {
 	DeltaPercent float64 `json:"deltaPercent"`
 }
 
+type BatchDiffRequest struct {
+	ReferenceTrace map[string]any   `json:"referenceTrace"`
+	ReferenceStats map[string]int64 `json:"referenceStats"`
+	Comparisons    []BatchCompareItem `json:"comparisons"`
+}
+
+type BatchCompareItem struct {
+	TraceID string         `json:"traceId"`
+	Trace   map[string]any `json:"trace"`
+	Stats   map[string]int64 `json:"stats"`
+}
+
+func (c *Client) ComputeBatch(ctx context.Context, req BatchDiffRequest) (map[string]any, error) {
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/internal/diffs/batch", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		var errResp map[string]any
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		return nil, fmt.Errorf("diff-service batch returned %d: %v", resp.StatusCode, errResp)
+	}
+	var result map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func (c *Client) Compute(ctx context.Context, traceA, traceB map[string]any, statsA, statsB map[string]int64) (map[string]any, error) {
 	reqBody := DiffRequest{
 		TraceA: traceA,

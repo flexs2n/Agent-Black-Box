@@ -372,8 +372,9 @@ type MonitorUpdate struct {
 }
 
 type IncidentUpdate struct {
-	Status    *IncidentStatus `json:"status"`
-	RootCause *string         `json:"root_cause"`
+	Status     *IncidentStatus `json:"status"`
+	RootCause  *string         `json:"root_cause"`
+	ResolvedAt *Time           `json:"resolved_at,omitempty"`
 }
 
 type WebhookCreate struct {
@@ -418,6 +419,15 @@ type MetricEvent struct {
 	Value       float64 `db:"value" json:"value"`
 	EvaluatedAt Time    `db:"evaluated_at" json:"evaluated_at"`
 	CreatedAt   Time    `db:"created_at" json:"created_at"`
+}
+
+type ThreadSummary struct {
+	ThreadID      string  `db:"thread_id" json:"thread_id"`
+	TraceCount    int     `db:"trace_count" json:"trace_count"`
+	FirstSeenAt   Time    `db:"first_seen_at" json:"first_seen_at"`
+	LastSeenAt    Time    `db:"last_seen_at" json:"last_seen_at"`
+	LastAgentName *string `db:"last_agent_name" json:"last_agent_name,omitempty"`
+	LastStatus    string  `db:"last_status" json:"last_status"`
 }
 
 type DashboardResponse struct {

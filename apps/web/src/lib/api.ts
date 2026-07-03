@@ -149,6 +149,15 @@ export interface MetricWithSparkline extends Metric {
   sparkline: number[];
 }
 
+export interface ThreadSummary {
+  thread_id: string;
+  trace_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  last_agent_name?: string;
+  last_status: string;
+}
+
 export interface PresetMetric {
   slug: string;
   name: string;
@@ -190,6 +199,49 @@ export interface DashboardResponse {
 
 export type IssueStatus = 'open' | 'acknowledged' | 'resolved' | 'dismissed';
 
+export interface Monitor {
+  id: string;
+  metric_id: string;
+  project_id: string;
+  condition: 'above' | 'below';
+  threshold: number;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  status: 'ok' | 'alerting' | 'resolved';
+  last_fired_at?: string;
+  notify_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MonitorCreate {
+  metric_id: string;
+  condition: 'above' | 'below';
+  threshold: number;
+  severity?: 'critical' | 'high' | 'medium' | 'low';
+  notify_json?: string;
+}
+
+export interface MonitorUpdate {
+  condition?: 'above' | 'below';
+  threshold?: number;
+  severity?: 'critical' | 'high' | 'medium' | 'low';
+  status?: 'ok' | 'alerting' | 'resolved';
+  notify_json?: string;
+}
+
+export interface Incident {
+  id: string;
+  monitor_id: string;
+  project_id: string;
+  status: 'unresolved' | 'analyzed' | 'resolved' | 'dismissed';
+  root_cause?: string;
+  affected_trace_count: number;
+  created_at: string;
+  resolved_at?: string;
+}
+
+export type IncidentStatus = 'unresolved' | 'analyzed' | 'resolved' | 'dismissed';
+
 async function request<T>(path: string, options?: RequestInit, apiKey?: string): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -211,6 +263,9 @@ export const api = {
   listTraces(apiKey?: string): Promise<Trace[]> {
     return request<Trace[]>('/api/v1/traces', undefined, apiKey);
   },
+  listThreads(apiKey?: string): Promise<ThreadSummary[]> {
+    return request<ThreadSummary[]>('/api/v1/threads', undefined, apiKey);
+  },
   getTrace(id: string, apiKey?: string): Promise<Trace & { spans?: Span[] }> {
     return request<Trace & { spans?: Span[] }>(`/api/v1/traces/${id}`, undefined, apiKey);
   },
@@ -226,6 +281,16 @@ export const api = {
       {
         method: 'DELETE',
         body: JSON.stringify({ ids }),
+      },
+      apiKey
+    );
+  },
+  computeBatchDiff(referenceTraceId: string, compareTraceIds: string[], apiKey?: string): Promise<unknown> {
+    return request<unknown>(
+      '/api/v1/diffs/batch',
+      {
+        method: 'POST',
+        body: JSON.stringify({ reference_trace_id: referenceTraceId, compare_trace_ids: compareTraceIds }),
       },
       apiKey
     );
@@ -331,5 +396,45 @@ export const api = {
   },
   listMetrics(apiKey?: string): Promise<MetricsResponse> {
     return request<MetricsResponse>('/api/v1/metrics', undefined, apiKey);
+  },
+
+  // Monitors
+  listMonitors(apiKey?: string): Promise<Monitor[]> {
+    return request<Monitor[]>('/api/v1/monitors', undefined, apiKey);
+  },
+  createMonitor(data: MonitorCreate, apiKey?: string): Promise<Monitor> {
+    return request<Monitor>(
+      '/api/v1/monitors',
+      { method: 'POST', body: JSON.stringify(data) },
+      apiKey
+    );
+  },
+  updateMonitor(id: string, data: MonitorUpdate, apiKey?: string): Promise<Monitor> {
+    return request<Monitor>(
+      `/api/v1/monitors/${id}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+      apiKey
+    );
+  },
+  deleteMonitor(id: string, apiKey?: string): Promise<void> {
+    return request<void>(`/api/v1/monitors/${id}`, { method: 'DELETE' }, apiKey);
+  },
+  monitorHistory(id: string, apiKey?: string): Promise<Incident[]> {
+    return request<Incident[]>(`/api/v1/monitors/${id}/history`, undefined, apiKey);
+  },
+
+  // Incidents
+  listIncidents(apiKey?: string): Promise<Incident[]> {
+    return request<Incident[]>('/api/v1/incidents', undefined, apiKey);
+  },
+  getIncident(id: string, apiKey?: string): Promise<Incident> {
+    return request<Incident>(`/api/v1/incidents/${id}`, undefined, apiKey);
+  },
+  updateIncidentStatus(id: string, status: IncidentStatus, apiKey?: string): Promise<Incident> {
+    return request<Incident>(
+      `/api/v1/incidents/${id}/status`,
+      { method: 'PATCH', body: JSON.stringify({ status }) },
+      apiKey
+    );
   },
 };

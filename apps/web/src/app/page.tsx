@@ -27,6 +27,12 @@ export default function Home() {
               View Traces
             </Link>
             <Link
+              href="/metrics"
+              className="px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300"
+            >
+              Metrics
+            </Link>
+            <Link
               href="/settings"
               className="px-4 py-2 bg-gray-200 text-gray-900 rounded hover:bg-gray-300"
             >

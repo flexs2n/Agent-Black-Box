@@ -503,6 +503,15 @@ func (s *SQLiteStore) MonitorDelete(ctx context.Context, monitorID string) error
 	return err
 }
 
+func (s *SQLiteStore) MonitorSetFired(ctx context.Context, monitorID string, status model.MonitorStatus, firedAt model.Time) error {
+	_, err := s.db.NamedExecContext(ctx, `UPDATE monitors SET status = :status, last_fired_at = :last_fired_at WHERE id = :id`, map[string]interface{}{
+		"id":             monitorID,
+		"status":         string(status),
+		"last_fired_at":  firedAt,
+	})
+	return err
+}
+
 // Incidents
 func (s *SQLiteStore) IncidentCreate(ctx context.Context, incident model.Incident) (model.Incident, error) {
 	_, err := s.db.NamedExecContext(ctx, `INSERT INTO incidents (id, monitor_id, project_id, status, root_cause, affected_trace_count, created_at, resolved_at) VALUES (:id, :monitor_id, :project_id, :status, :root_cause, :affected_trace_count, :created_at, :resolved_at)`, incident)
@@ -521,6 +530,12 @@ func (s *SQLiteStore) IncidentGet(ctx context.Context, incidentID string) (model
 	return incident, err
 }
 
+func (s *SQLiteStore) IncidentListByMonitor(ctx context.Context, monitorID string) ([]model.Incident, error) {
+	var incidents []model.Incident
+	err := s.db.SelectContext(ctx, &incidents, `SELECT id, monitor_id, project_id, status, root_cause, affected_trace_count, created_at, resolved_at FROM incidents WHERE monitor_id = ? ORDER BY created_at DESC`, monitorID)
+	return incidents, err
+}
+
 func (s *SQLiteStore) IncidentUpdate(ctx context.Context, incidentID string, update model.IncidentUpdate) (model.Incident, error) {
 	existing, err := s.IncidentGet(ctx, incidentID)
 	if err != nil {
@@ -532,7 +547,10 @@ func (s *SQLiteStore) IncidentUpdate(ctx context.Context, incidentID string, upd
 	if update.RootCause != nil {
 		existing.RootCause = update.RootCause
 	}
-	_, err = s.db.NamedExecContext(ctx, `UPDATE incidents SET status = :status, root_cause = :root_cause WHERE id = :id`, existing)
+	if update.ResolvedAt != nil {
+		existing.ResolvedAt = update.ResolvedAt
+	}
+	_, err = s.db.NamedExecContext(ctx, `UPDATE incidents SET status = :status, root_cause = :root_cause, resolved_at = :resolved_at WHERE id = :id`, existing)
 	return existing, err
 }
 
@@ -660,6 +678,24 @@ func (s *SQLiteStore) TracesByHour(ctx context.Context, projectID string, hours 
 		GROUP BY hour ORDER BY hour DESC LIMIT ?`
 	err := s.db.SelectContext(ctx, &results, query, projectID, hours)
 	return results, err
+}
+
+func (s *SQLiteStore) ThreadList(ctx context.Context, projectID string) ([]model.ThreadSummary, error) {
+	var threads []model.ThreadSummary
+	err := s.db.SelectContext(ctx, &threads, `
+		SELECT
+			thread_id,
+			COUNT(*) AS trace_count,
+			MIN(created_at) AS first_seen_at,
+			MAX(created_at) AS last_seen_at,
+			(SELECT agent_name FROM traces t2 WHERE t2.project_id = ? AND t2.thread_id = t1.thread_id ORDER BY t2.created_at DESC LIMIT 1) AS last_agent_name,
+			(SELECT status FROM traces t3 WHERE t3.project_id = ? AND t3.thread_id = t1.thread_id ORDER BY t3.created_at DESC LIMIT 1) AS last_status
+		FROM traces t1
+		WHERE t1.project_id = ? AND t1.thread_id IS NOT NULL
+		GROUP BY t1.thread_id
+		ORDER BY last_seen_at DESC
+	`, projectID, projectID, projectID)
+	return threads, err
 }
 
 func (s *SQLiteStore) PresetMetrics(ctx context.Context, projectID string, windowSecs int) ([]model.PresetMetric, error) {

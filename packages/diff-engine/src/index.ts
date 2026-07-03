@@ -1,5 +1,5 @@
 export { normalizeTree, normalizeSpan, flattenNormalized } from "./normalize.js";
-export { computeDiff, computeMetricDelta } from "./diffAlgorithm.js";
+export { computeDiff, computeMetricDelta, computeBatchDiff } from "./diffAlgorithm.js";
 export type {
   DiffResult,
   SpanDiff,
@@ -12,3 +12,4 @@ export type {
   NormalizedSpan,
   TraceStats,
 } from "./types.js";
+export type { BatchDiffResult } from "./diffAlgorithm.js";
