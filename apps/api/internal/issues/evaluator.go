@@ -7,6 +7,7 @@ import (
 
 	"github.com/blackbox-agentdiff/api/internal/model"
 	"github.com/blackbox-agentdiff/api/internal/store"
+	"github.com/blackbox-agentdiff/api/internal/webhook"
 	"github.com/google/uuid"
 )
 
@@ -214,7 +215,7 @@ func Fingerprint(findings []IssueFinding) string {
 	return uuid.NewSHA1(uuid.Nil, []byte(fmt.Sprintf("%v", keys))).String()
 }
 
-func ProcessFindings(ctx context.Context, store store.Store, projectID, traceID string, findings []IssueFinding) error {
+func ProcessFindings(ctx context.Context, store store.Store, dispatcher *webhook.Dispatcher, projectID, traceID string, findings []IssueFinding) error {
 	for _, f := range findings {
 		fp := Fingerprint([]IssueFinding{f})
 		existing, _ := store.IssueGetByFingerprint(ctx, projectID, fp)
@@ -237,6 +238,10 @@ func ProcessFindings(ctx context.Context, store store.Store, projectID, traceID 
 				TraceID:  traceID,
 				Evidence: string(evidenceJSON),
 			})
+			// Notify webhooks about new issue
+			if dispatcher != nil {
+				dispatcher.IssueOpened(ctx, projectID, issue)
+			}
 		} else if existing.Status == "open" || existing.Status == "acknowledged" {
 			_, _ = store.IssueOccurrenceCreate(ctx, model.IssueOccurrenceCreate{
 				IssueID:  existing.ID,

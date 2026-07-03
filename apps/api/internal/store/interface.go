@@ -100,4 +100,11 @@ type Store interface {
 	// Dashboard aggregations
 	DashboardStats(ctx context.Context, projectID string) (model.DashboardStats, error)
 	TracesByHour(ctx context.Context, projectID string, hours int) ([]model.TraceByHour, error)
+
+	// Preset metrics
+	PresetMetrics(ctx context.Context, projectID string, windowSecs int) ([]model.PresetMetric, error)
+
+	// Webhook delivery
+	WebhookListByEvent(ctx context.Context, projectID string, eventType string) ([]model.Webhook, error)
+	WebhookDeliveryCreate(ctx context.Context, d model.WebhookDelivery) error
 }

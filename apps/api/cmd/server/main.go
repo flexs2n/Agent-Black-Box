@@ -16,6 +16,7 @@ import (
 	"github.com/blackbox-agentdiff/api/internal/migrate"
 	"github.com/blackbox-agentdiff/api/internal/rest"
 	"github.com/blackbox-agentdiff/api/internal/store"
+	"github.com/blackbox-agentdiff/api/internal/webhook"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
 )
@@ -45,6 +46,7 @@ func main() {
 	defer st.Close()
 
 	diffClient := diffproxy.NewClient(cfg.DiffServiceURL)
+	dispatcher := webhook.NewDispatcher(st)
 
 	r := chi.NewRouter()
 	r.Use(cors.Handler(cors.Options{
@@ -69,11 +71,11 @@ func main() {
 
 	otelGroup := r.Group(func(r chi.Router) {
 		r.Use(auth.Middleware(st))
-		r.Post("/otel/v1/traces", ingest.NewHandler(st).HTTP)
+		r.Post("/otel/v1/traces", ingest.NewHandler(st, dispatcher).HTTP)
 	})
 	_ = otelGroup
 
-	handlers := rest.New(st, diffClient)
+	handlers := rest.New(st, diffClient, dispatcher)
 	handlers.Register(r)
 
 	srv := &http.Server{

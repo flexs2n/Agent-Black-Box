@@ -1,0 +1,32 @@
+name: "Agent Regression Test"
+description: "Diff the latest trace against a baseline and assert minimum similarity"
+inputs:
+  api-key:
+    description: "Blackbox API key"
+    required: true
+  project-id:
+    description: "Blackbox project ID"
+    required: true
+  baseline-label:
+    description: "Baseline label to compare against"
+    required: true
+  min-similarity:
+    description: "Minimum similarity score (0-100)"
+    required: false
+    default: "80"
+  base-url:
+    description: "Blackbox API base URL"
+    required: false
+    default: "http://localhost:4000"
+runs:
+  using: "composite"
+  steps:
+    - run: |
+        npx -y @blackbox/agentdiff-cli@latest assert \
+          --baseline "${{ inputs.baseline-label }}" \
+          --min-similarity "${{ inputs.min-similarity }}"
+      shell: bash
+      env:
+        BLACKBOX_API_KEY: ${{ inputs.api-key }}
+        BLACKBOX_PROJECT_ID: ${{ inputs.project-id }}
+        BLACKBOX_BASE_URL: ${{ inputs.base-url }}

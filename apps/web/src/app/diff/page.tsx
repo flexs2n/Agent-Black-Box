@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { api, Trace, DiffResult } from '@/lib/api';
+import { api, Trace, DiffResult, WordDiffChunk, JsonDiffNode } from '@/lib/api';
 
 export default function DiffPage({ searchParams }: { searchParams: { traceA?: string; traceB?: string; baseline?: string } }) {
   const [traces, setTraces] = useState<Trace[]>([]);
@@ -47,6 +47,47 @@ export default function DiffPage({ searchParams }: { searchParams: { traceA?: st
       setLoading(false);
     }
   };
+
+  const renderWordDiff = (chunks: WordDiffChunk[]) => (
+    <div className="font-mono text-xs leading-relaxed p-2 bg-white border border-gray-200 rounded whitespace-pre-wrap">
+      {chunks.map((chunk, i) => {
+        if (chunk.type === 'added') return <span key={i} className="bg-green-200 text-green-900">{chunk.text}</span>;
+        if (chunk.type === 'removed') return <span key={i} className="bg-red-200 text-red-900 line-through">{chunk.text}</span>;
+        return <span key={i} className="text-gray-700">{chunk.text}</span>;
+      })}
+    </div>
+  );
+
+  const renderJsonDiff = (nodes: JsonDiffNode[], depth = 0) => (
+    <div style={{ paddingLeft: `${depth * 16}px` }} className="font-mono text-xs leading-relaxed">
+      {nodes.map((node, i) => {
+        if (node.type === 'nested') {
+          return (
+            <div key={i}>
+              <span className="text-gray-500">{node.key}:</span>
+              {node.children ? renderJsonDiff(node.children, depth + 1) : <span className="text-gray-400"> null</span>}
+            </div>
+          );
+        }
+        const valStr = node.type === 'added' ? JSON.stringify(node.valueB) : node.type === 'removed' ? JSON.stringify(node.valueA) : `${JSON.stringify(node.valueA)} → ${JSON.stringify(node.valueB)}`;
+        return (
+          <div key={i}>
+            <span className="text-gray-500">{node.key}:</span>{' '}
+            {node.type === 'added' && <span className="text-green-600">{valStr}</span>}
+            {node.type === 'removed' && <span className="text-red-600 line-through">{valStr}</span>}
+            {node.type === 'changed' && (
+              <>
+                <span className="text-red-600 line-through">{JSON.stringify(node.valueA)}</span>
+                {' → '}
+                <span className="text-green-600">{JSON.stringify(node.valueB)}</span>
+              </>
+            )}
+            {node.type === 'unchanged' && <span className="text-gray-400">{valStr}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   const similarityColor = (score: number) => {
     if (score >= 90) return 'text-green-600 bg-green-100';
@@ -212,6 +253,18 @@ export default function DiffPage({ searchParams }: { searchParams: { traceA?: st
                             )}
                           </div>
                         ))}
+                      </div>
+                    )}
+                    {diff.contentDiff && (
+                      <div className="mt-2 pl-4">
+                        <div className="text-xs font-semibold text-gray-700 mb-1">
+                          {diff.contentDiff.type === 'prompt' ? 'Prompt Diff' : 'Tool Args Diff'}
+                        </div>
+                        {diff.contentDiff.wordDiff ? (
+                          renderWordDiff(diff.contentDiff.wordDiff)
+                        ) : diff.contentDiff.jsonDiff ? (
+                          renderJsonDiff(diff.contentDiff.jsonDiff)
+                        ) : null}
                       </div>
                     )}
                   </div>

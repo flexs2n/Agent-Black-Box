@@ -12,6 +12,7 @@ import (
 	"github.com/blackbox-agentdiff/api/internal/diffproxy"
 	"github.com/blackbox-agentdiff/api/internal/model"
 	"github.com/blackbox-agentdiff/api/internal/store"
+	"github.com/blackbox-agentdiff/api/internal/webhook"
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,10 +20,11 @@ import (
 type Handlers struct {
 	store      store.Store
 	diffClient *diffproxy.Client
+	dispatcher *webhook.Dispatcher
 }
 
-func New(st store.Store, diffClient *diffproxy.Client) *Handlers {
-	return &Handlers{store: st, diffClient: diffClient}
+func New(st store.Store, diffClient *diffproxy.Client, dispatcher *webhook.Dispatcher) *Handlers {
+	return &Handlers{store: st, diffClient: diffClient, dispatcher: dispatcher}
 }
 
 func (h *Handlers) Register(r chi.Router) {
@@ -634,7 +636,7 @@ func (h *Handlers) GetIssue(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) UpdateIssueStatus(w http.ResponseWriter, r *http.Request) {
-	_, ok := auth.ProjectIDFromContext(r.Context())
+	projectID, ok := auth.ProjectIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
@@ -650,6 +652,9 @@ func (h *Handlers) UpdateIssueStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if req.Status != nil && *req.Status == model.IssueStatusResolved && h.dispatcher != nil {
+		h.dispatcher.IssueResolved(r.Context(), projectID, issue)
+	}
 	json.NewEncoder(w).Encode(issue)
 }
 
@@ -659,25 +664,26 @@ func (h *Handlers) ListMetrics(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	metrics, err := h.store.MetricList(r.Context(), projectID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	result := make([]model.MetricWithSparkline, len(metrics))
-	for i, m := range metrics {
+	customMetrics, _ := h.store.MetricList(r.Context(), projectID)
+	presetMetrics, _ := h.store.PresetMetrics(r.Context(), projectID, 3600)
+	customResult := make([]model.MetricWithSparkline, len(customMetrics))
+	for i, m := range customMetrics {
 		events, _ := h.store.MetricEventsGet(r.Context(), m.ID, 24)
 		sparkline := make([]float64, len(events))
 		for j, e := range events {
 			sparkline[j] = e.Value
 		}
-		result[i] = model.MetricWithSparkline{
+		customResult[i] = model.MetricWithSparkline{
 			Metric:       m,
 			CurrentValue: 0,
 			Sparkline:    sparkline,
 		}
 	}
-	json.NewEncoder(w).Encode(result)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"preset": presetMetrics,
+		"custom": customResult,
+	})
 }
 
 func (h *Handlers) ListWebhooks(w http.ResponseWriter, r *http.Request) {

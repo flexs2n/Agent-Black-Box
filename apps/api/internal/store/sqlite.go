@@ -661,3 +661,66 @@ func (s *SQLiteStore) TracesByHour(ctx context.Context, projectID string, hours 
 	err := s.db.SelectContext(ctx, &results, query, projectID, hours)
 	return results, err
 }
+
+func (s *SQLiteStore) PresetMetrics(ctx context.Context, projectID string, windowSecs int) ([]model.PresetMetric, error) {
+	var metrics []model.PresetMetric
+	windowExpr := fmt.Sprintf("-%d seconds", windowSecs)
+
+	var totalTraces, successTraces, errorTraces int64
+	var totalInput, totalOutput, totalTokens float64
+	var traceCount int64
+
+	s.db.GetContext(ctx, &totalTraces, `SELECT COUNT(*) FROM traces WHERE project_id = ? AND created_at >= datetime('now', ?+0, ?)`, projectID, windowExpr)
+	s.db.GetContext(ctx, &successTraces, `SELECT COUNT(*) FROM traces WHERE project_id = ? AND status = 'success' AND created_at >= datetime('now', ?+0, ?)`, projectID, windowExpr)
+	s.db.GetContext(ctx, &errorTraces, `SELECT COUNT(*) FROM traces WHERE project_id = ? AND status = 'error' AND created_at >= datetime('now', ?+0, ?)`, projectID, windowExpr)
+
+	if totalTraces > 0 {
+		metrics = append(metrics, model.PresetMetric{Slug: "trace_success_rate", Name: "Trace Success Rate", Value: float64(successTraces) / float64(totalTraces) * 100, Format: "percentage"})
+		metrics = append(metrics, model.PresetMetric{Slug: "error_rate", Name: "Error Rate", Value: float64(errorTraces) / float64(totalTraces) * 100, Format: "percentage"})
+	}
+
+	var totalToolSpans, okToolSpans int64
+	s.db.GetContext(ctx, &totalToolSpans, `SELECT COUNT(*) FROM spans WHERE project_id = ? AND span_kind = 'tool'`, projectID)
+	s.db.GetContext(ctx, &okToolSpans, `SELECT COUNT(*) FROM spans WHERE project_id = ? AND span_kind = 'tool' AND status = 'ok'`, projectID)
+	if totalToolSpans > 0 {
+		metrics = append(metrics, model.PresetMetric{Slug: "tool_call_success_rate", Name: "Tool Call Success Rate", Value: float64(okToolSpans) / float64(totalToolSpans) * 100, Format: "percentage"})
+	}
+
+	s.db.GetContext(ctx, &totalInput, `SELECT COALESCE(AVG(total_input_tokens), 0) FROM trace_stats WHERE project_id = ? AND created_at >= datetime('now', ?+0, ?)`, projectID, windowExpr)
+	s.db.GetContext(ctx, &totalOutput, `SELECT COALESCE(AVG(total_output_tokens), 0) FROM trace_stats WHERE project_id = ? AND created_at >= datetime('now', ?+0, ?)`, projectID, windowExpr)
+	s.db.GetContext(ctx, &totalTokens, `SELECT COALESCE(AVG(total_tokens), 0) FROM trace_stats WHERE project_id = ? AND created_at >= datetime('now', ?+0, ?)`, projectID, windowExpr)
+	metrics = append(metrics, model.PresetMetric{Slug: "avg_input_tokens", Name: "Avg Input Tokens", Value: totalInput, Format: "count"})
+	metrics = append(metrics, model.PresetMetric{Slug: "avg_output_tokens", Name: "Avg Output Tokens", Value: totalOutput, Format: "count"})
+	metrics = append(metrics, model.PresetMetric{Slug: "avg_total_tokens", Name: "Avg Total Tokens", Value: totalTokens, Format: "count"})
+
+	var durations []int64
+	s.db.SelectContext(ctx, &durations, `SELECT duration_ms FROM traces WHERE project_id = ? AND duration_ms IS NOT NULL AND created_at >= datetime('now', ?+0, ?) ORDER BY duration_ms`, projectID, windowExpr)
+	if len(durations) > 0 {
+		p50 := durations[len(durations)*50/100]
+		p95 := durations[len(durations)*95/100]
+		p99 := durations[len(durations)*99/100]
+		metrics = append(metrics, model.PresetMetric{Slug: "p50_latency", Name: "P50 Latency", Value: float64(p50), Format: "ms"})
+		metrics = append(metrics, model.PresetMetric{Slug: "p95_latency", Name: "P95 Latency", Value: float64(p95), Format: "ms"})
+		metrics = append(metrics, model.PresetMetric{Slug: "p99_latency", Name: "P99 Latency", Value: float64(p99), Format: "ms"})
+	}
+
+	s.db.GetContext(ctx, &traceCount, `SELECT COUNT(*) FROM traces WHERE project_id = ? AND created_at >= datetime('now', ?+0, ?)`, projectID, windowExpr)
+	minutes := float64(windowSecs) / 60
+	if minutes > 0 {
+		metrics = append(metrics, model.PresetMetric{Slug: "traces_per_minute", Name: "Traces Per Minute", Value: float64(traceCount) / minutes, Format: "rate"})
+	}
+
+	return metrics, nil
+}
+
+// Webhook delivery
+func (s *SQLiteStore) WebhookListByEvent(ctx context.Context, projectID string, eventType string) ([]model.Webhook, error) {
+	var webhooks []model.Webhook
+	err := s.db.SelectContext(ctx, &webhooks, `SELECT id, project_id, url, secret_hash, events, enabled, created_at, updated_at FROM webhooks WHERE project_id = ? AND enabled = 1 AND events LIKE ?`, projectID, `%"`+eventType+`"%`)
+	return webhooks, err
+}
+
+func (s *SQLiteStore) WebhookDeliveryCreate(ctx context.Context, d model.WebhookDelivery) error {
+	_, err := s.db.NamedExecContext(ctx, `INSERT INTO webhook_deliveries (id, webhook_id, event, payload, status_code, response, attempt, created_at) VALUES (:id, :webhook_id, :event, :payload, :status_code, :response, :attempt, :created_at)`, d)
+	return err
+}

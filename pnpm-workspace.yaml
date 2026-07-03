@@ -3,6 +3,7 @@ packages:
   - apps/diff-service
   - packages/diff-engine
   - packages/sdk-typescript
+  - packages/cli
 
 catalog:
   typescript: ^5.5.4

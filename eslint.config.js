@@ -33,6 +33,11 @@ const nodeGlobals = {
   __filename: 'readonly',
   Buffer: 'readonly',
   global: 'readonly',
+  RequestInit: 'readonly',
+  Request: 'readonly',
+  Response: 'readonly',
+  Headers: 'readonly',
+  fetch: 'readonly',
 };
 
 module.exports = [

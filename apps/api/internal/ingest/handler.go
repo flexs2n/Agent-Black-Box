@@ -11,14 +11,16 @@ import (
 	"github.com/blackbox-agentdiff/api/internal/issues"
 	"github.com/blackbox-agentdiff/api/internal/normalize"
 	"github.com/blackbox-agentdiff/api/internal/store"
+	"github.com/blackbox-agentdiff/api/internal/webhook"
 )
 
 type Handler struct {
-	store store.Store
+	store      store.Store
+	dispatcher *webhook.Dispatcher
 }
 
-func NewHandler(store store.Store) *Handler {
-	return &Handler{store: store}
+func NewHandler(store store.Store, dispatcher *webhook.Dispatcher) *Handler {
+	return &Handler{store: store, dispatcher: dispatcher}
 }
 
 type OTLPExportRequest struct {
@@ -123,7 +125,7 @@ func (h *Handler) HTTP(w http.ResponseWriter, r *http.Request) {
 	// Trigger issue detection in background goroutine (local mode: in-process)
 	go func() {
 		findings, _ := issues.RunAllEvaluators(r.Context(), trace, spans, stats)
-		_ = issues.ProcessFindings(r.Context(), h.store, projectID, trace.ID, findings)
+		_ = issues.ProcessFindings(r.Context(), h.store, h.dispatcher, projectID, trace.ID, findings)
 	}()
 
 	w.WriteHeader(http.StatusAccepted)

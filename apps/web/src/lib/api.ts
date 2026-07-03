@@ -32,24 +32,46 @@ export interface Span {
   attributes: string;
 }
 
+export interface WordDiffChunk {
+  type: 'added' | 'removed' | 'unchanged';
+  text: string;
+}
+
+export interface JsonDiffNode {
+  key: string;
+  type: 'added' | 'removed' | 'changed' | 'unchanged' | 'nested';
+  valueA?: unknown;
+  valueB?: unknown;
+  children?: JsonDiffNode[];
+}
+
+export interface ContentDiff {
+  type: 'prompt' | 'tool_args' | 'tool_output';
+  wordDiff?: WordDiffChunk[];
+  jsonDiff?: JsonDiffNode[];
+}
+
+export interface SpanDiff {
+  status: 'unchanged' | 'changed' | 'added' | 'removed' | 'moved';
+  spanAId?: string;
+  spanBId?: string;
+  name: string;
+  spanKind: string;
+  depth: number;
+  attributeDiffs?: Array<{
+    key: string;
+    valueA?: string;
+    valueB?: string;
+    changeType: 'added' | 'removed' | 'changed';
+  }>;
+  contentDiff?: ContentDiff;
+}
+
 export interface DiffResult {
   traceAId: string;
   traceBId: string;
   similarityScore: number;
-  spanDiffs: Array<{
-    status: 'unchanged' | 'changed' | 'added' | 'removed' | 'moved';
-    spanAId?: string;
-    spanBId?: string;
-    name: string;
-    spanKind: string;
-    depth: number;
-    attributeDiffs?: Array<{
-      key: string;
-      valueA?: string;
-      valueB?: string;
-      changeType: 'added' | 'removed' | 'changed';
-    }>;
-  }>;
+  spanDiffs: SpanDiff[];
   metricDelta: {
     durationMs: { a: number; b: number; delta: number; deltaPercent: number };
     inputTokens: { a: number; b: number; delta: number };
@@ -125,6 +147,19 @@ export interface Metric {
 export interface MetricWithSparkline extends Metric {
   current_value: number;
   sparkline: number[];
+}
+
+export interface PresetMetric {
+  slug: string;
+  name: string;
+  value: number;
+  format: string;
+  sparkline: number[];
+}
+
+export interface MetricsResponse {
+  preset: PresetMetric[];
+  custom: MetricWithSparkline[];
 }
 
 export interface DashboardStats {
@@ -294,7 +329,7 @@ export const api = {
       apiKey
     );
   },
-  listMetrics(apiKey?: string): Promise<MetricWithSparkline[]> {
-    return request<MetricWithSparkline[]>('/api/v1/metrics', undefined, apiKey);
+  listMetrics(apiKey?: string): Promise<MetricsResponse> {
+    return request<MetricsResponse>('/api/v1/metrics', undefined, apiKey);
   },
 };

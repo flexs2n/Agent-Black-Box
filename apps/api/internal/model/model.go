@@ -428,6 +428,14 @@ type DashboardResponse struct {
 
 type MetricWithSparkline struct {
 	Metric
-	CurrentValue float64   `json:"current_value"`
-	Sparkline    []float64 `json:"sparkline"`
+	CurrentValue   float64   `json:"current_value"`
+	Sparkline      []float64 `json:"sparkline"`
+}
+
+type PresetMetric struct {
+	Slug      string    `json:"slug"`
+	Name      string    `json:"name"`
+	Value     float64   `json:"value"`
+	Format    string    `json:"format"`
+	Sparkline []float64 `json:"sparkline"`
 }
