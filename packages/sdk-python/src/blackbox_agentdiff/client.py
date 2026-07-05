@@ -4,15 +4,16 @@ Blackbox-AgentDiff Python SDK
 A clean abstraction for tracing agent executions with the Blackbox API.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Generator
-from urllib.request import Request, urlopen
+from typing import Any, Dict, List, Optional
 from urllib.error import HTTPError
-
+from urllib.request import Request, urlopen
 
 __version__ = "0.1.0"
 
@@ -45,9 +46,9 @@ class TraceContext:
     start_time: float
     input: Optional[Dict[str, Any]] = None
     output: Optional[Dict[str, Any]] = None
-    _spans: list = field(default_factory=list)
+    _spans: List[SpanContext] = field(default_factory=list)
 
-    def generation(self, name: str, model: str = "", **kwargs):
+    def generation(self, name: str, model: str = "", **kwargs: Any) -> SpanContext:
         span = SpanContext(
             trace_id=self.trace_id,
             project_id=self.project_id,
@@ -60,7 +61,7 @@ class TraceContext:
         self._spans.append(span)
         return span
 
-    def tool(self, name: str, **kwargs):
+    def tool(self, name: str, **kwargs: Any) -> SpanContext:
         span = SpanContext(
             trace_id=self.trace_id,
             project_id=self.project_id,
@@ -72,7 +73,7 @@ class TraceContext:
         self._spans.append(span)
         return span
 
-    def retrieval(self, name: str, **kwargs):
+    def retrieval(self, name: str, **kwargs: Any) -> SpanContext:
         span = SpanContext(
             trace_id=self.trace_id,
             project_id=self.project_id,
@@ -84,14 +85,14 @@ class TraceContext:
         self._spans.append(span)
         return span
 
-    def set_output(self, output: Dict[str, Any]):
+    def set_output(self, output: Dict[str, Any]) -> None:
         self.output = output
 
-    def end(self):
+    def end(self) -> None:
         self.end_time = time.time()
         self._export()
 
-    def _export(self):
+    def _export(self) -> None:
         spans = []
         for span in self._spans:
             attrs = {
@@ -124,7 +125,7 @@ class TraceContext:
                 "name": span.name,
                 "kind": 1,
                 "start_time_unix_nano": int(span.start_time * 1e9),
-                "end_time_unix_nano": int(span.end_time * 1e9),
+                "end_time_unix_nano": int((span.end_time or span.start_time) * 1e9),
                 "attributes": event["attributes"],
                 "status": {"code": 1},
             })
@@ -148,8 +149,7 @@ class TraceContext:
             method="POST",
         )
         try:
-            with urlopen(req) as resp:
-                pass
+            urlopen(req)
         except HTTPError as e:
             raise BlackboxError(f"Export failed: {e.code} {e.reason}")
 
@@ -172,7 +172,7 @@ class SpanContext:
     attributes: Dict[str, Any] = field(default_factory=dict)
     error: Optional[str] = None
 
-    def record(self, input=None, output=None, input_tokens=None, output_tokens=None, **kwargs):
+    def record(self, input: Any = None, output: Any = None, input_tokens: Optional[int] = None, output_tokens: Optional[int] = None, **kwargs: Any) -> None:
         if input is not None:
             self.input = input
         if output is not None:
@@ -184,7 +184,7 @@ class SpanContext:
         self.end_time = time.time()
         self.duration_ms = int((self.end_time - self.start_time) * 1000)
 
-    def set_error(self, message: str):
+    def set_error(self, message: str) -> None:
         self.error = message
 
 
@@ -215,7 +215,7 @@ def init(
     api_key: Optional[str] = None,
     project_id: Optional[str] = None,
     base_url: Optional[str] = None,
-):
+) -> None:
     global _config
     api_key = api_key or os.environ.get("BLACKBOX_API_KEY", "")
     project_id = project_id or os.environ.get("BLACKBOX_PROJECT_ID", "")
@@ -223,7 +223,7 @@ def init(
     _config = Config(api_key=api_key, project_id=project_id, base_url=base_url)
 
 
-def trace(name: str, input: Optional[Dict[str, Any]] = None, **kwargs) -> TraceContext:
+def trace(name: str, input: Optional[Dict[str, Any]] = None, **kwargs: Any) -> TraceContext:
     config = _get_config()
     ctx = TraceContext(
         trace_id=str(uuid.uuid4()),
@@ -241,17 +241,17 @@ class Blackbox:
         api_key: Optional[str] = None,
         project_id: Optional[str] = None,
         base_url: Optional[str] = None,
-    ):
+    ) -> None:
         init(api_key=api_key, project_id=project_id, base_url=base_url)
 
-    def trace(self, name: str, input: Optional[Dict[str, Any]] = None, **kwargs) -> TraceContext:
+    def trace(self, name: str, input: Optional[Dict[str, Any]] = None, **kwargs: Any) -> TraceContext:
         return trace(name, input=input, **kwargs)
 
-    def generation(self, name: str, model: str = "", **kwargs):
+    def generation(self, name: str, model: str = "", **kwargs: Any) -> Any:
         return lambda trace: trace.generation(name, model=model, **kwargs)
 
-    def tool(self, name: str, **kwargs):
+    def tool(self, name: str, **kwargs: Any) -> Any:
         return lambda trace: trace.tool(name, **kwargs)
 
-    def retrieval(self, name: str, **kwargs):
+    def retrieval(self, name: str, **kwargs: Any) -> Any:
         return lambda trace: trace.retrieval(name, **kwargs)

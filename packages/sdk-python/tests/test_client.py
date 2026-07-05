@@ -71,7 +71,7 @@ class TestSpanRecording:
 
 
 class TestExport:
-    @patch("urllib.request.urlopen")
+    @patch("blackbox_agentdiff.client.urlopen")
     def test_successful_export(self, mock_urlopen):
         ctx = trace("test", input={"msg": "hi"})
         gen = ctx.generation("gpt4", model="gpt-4o")
@@ -88,9 +88,9 @@ class TestExport:
         req = mock_urlopen.call_args[0][0]
         assert req.get_header("Authorization") == "Bearer test-key"
         body = json.loads(req.data)
-        assert "resourceSpans" in body
+        assert "resource_spans" in body
 
-    @patch("urllib.request.urlopen")
+    @patch("blackbox_agentdiff.client.urlopen")
     def test_export_failure(self, mock_urlopen):
         from urllib.error import HTTPError
         mock_urlopen.side_effect = HTTPError(

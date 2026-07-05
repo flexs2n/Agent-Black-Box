@@ -2,7 +2,7 @@
 
 const API_URL = process.env.BLACKBOX_BASE_URL || "http://localhost:4000";
 
-interface Args {
+export interface Args {
   _: string[];
   trace?: string;
   baseline?: string;
@@ -11,7 +11,7 @@ interface Args {
   limit?: number;
 }
 
-function parseArgs(argv: string[]): Args {
+export function parseArgs(argv: string[]): Args {
   const args: Args = { _: [] };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
@@ -136,7 +136,7 @@ async function assertSimilarity(baseline: string, minSimilarity: number) {
   console.log(`PASS: similarity ${score}% meets threshold ${minSimilarity}%`);
 }
 
-async function main() {
+export async function main() {
   const args = parseArgs(process.argv);
 
   if (args._.length === 0) {
@@ -194,7 +194,9 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e.message);
-  process.exit(1);
-});
+if (process.env.VITEST === undefined) {
+  main().catch((e) => {
+    console.error(e.message);
+    process.exit(1);
+  });
+}

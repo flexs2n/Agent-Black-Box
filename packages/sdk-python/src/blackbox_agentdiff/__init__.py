@@ -3,15 +3,15 @@ Blackbox-AgentDiff SDK
 """
 
 from .client import (
-    Blackbox,
-    trace,
-    init,
-    Config,
-    TraceContext,
-    SpanContext,
-    BlackboxError,
     AuthenticationError,
+    Blackbox,
+    BlackboxError,
+    Config,
     NotFoundError,
+    SpanContext,
+    TraceContext,
+    init,
+    trace,
 )
 
 __all__ = [

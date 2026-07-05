@@ -1,0 +1,9 @@
+pyproject.toml
+src/blackbox_agentdiff/__init__.py
+src/blackbox_agentdiff/client.py
+src/blackbox_agentdiff.egg-info/PKG-INFO
+src/blackbox_agentdiff.egg-info/SOURCES.txt
+src/blackbox_agentdiff.egg-info/dependency_links.txt
+src/blackbox_agentdiff.egg-info/requires.txt
+src/blackbox_agentdiff.egg-info/top_level.txt
+tests/test_client.py

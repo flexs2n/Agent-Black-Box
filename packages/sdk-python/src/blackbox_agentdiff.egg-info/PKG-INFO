@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: blackbox-agentdiff
+Version: 0.1.0
+Summary: Python SDK for Blackbox-AgentDiff
+Requires-Python: >=3.10
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
