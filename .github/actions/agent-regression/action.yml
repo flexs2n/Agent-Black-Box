@@ -22,7 +22,7 @@ runs:
   using: "composite"
   steps:
     - run: |
-        npx -y @blackbox/agentdiff-cli@latest assert \
+        npx tsx packages/cli/src/index.ts assert \
           --baseline "${{ inputs.baseline-label }}" \
           --min-similarity "${{ inputs.min-similarity }}"
       shell: bash

@@ -24,19 +24,6 @@ jobs:
   regression:
     name: Regression Test
     runs-on: ubuntu-latest
-    services:
-      api:
-        image: blackbox-agentdiff-api:latest
-        ports:
-          - 4000:4000
-        env:
-          SECRET_KEY: test-secret-key
-          DATABASE_URL: /data/test.db
-        options: >-
-          --health-cmd "curl -f http://localhost:4000/healthz"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -49,11 +36,37 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
       - run: pnpm install --frozen-lockfile
+
+      - name: Build and start API server
+        run: |
+          cd apps/api
+          go build -o server ./cmd/server
+          mkdir -p data
+          DATABASE_URL="./data/test.db" \
+          SECRET_KEY="test-secret-key" \
+          DIFF_SERVICE_URL="http://localhost:5001" \
+          LOG_LEVEL="debug" \
+          ./server &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> $GITHUB_ENV
+          sleep 3
+          for i in 1 2 3 4 5; do
+            if curl -sf http://localhost:4000/healthz > /dev/null 2>&1; then
+              echo "API server is healthy"
+              break
+            fi
+            echo "Waiting for API server... attempt $i"
+            sleep 2
+          done
 
       - name: Run agent test
         run: |
-          # Create a test trace via the SDK
           cd packages/sdk-typescript
           npx tsx src/test.ts 2>&1 || true
         env:
@@ -68,6 +81,13 @@ jobs:
           baseline-label: ${{ github.event.inputs.baseline-label || 'main' }}
           min-similarity: ${{ github.event.inputs.min-similarity || '80' }}
           base-url: http://localhost:4000
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -n "$SERVER_PID" ]; then
+            kill $SERVER_PID 2>/dev/null || true
+          fi
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
