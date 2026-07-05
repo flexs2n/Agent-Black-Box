@@ -6,15 +6,16 @@ import (
 )
 
 type Config struct {
-	DatabaseURL     string
-	SecretKey       string
-	DiffServiceURL  string
-	LogLevel        string
-	ReadTimeout     time.Duration
-	WriteTimeout    time.Duration
-	IdleTimeout     time.Duration
-	ShutdownTimeout time.Duration
-	MonitorInterval time.Duration
+	DatabaseURL      string
+	SecretKey        string
+	DiffServiceURL   string
+	ClickHouseURL    string
+	LogLevel         string
+	ReadTimeout      time.Duration
+	WriteTimeout     time.Duration
+	IdleTimeout      time.Duration
+	ShutdownTimeout  time.Duration
+	MonitorInterval  time.Duration
 }
 
 func Load() *Config {
@@ -28,6 +29,7 @@ func Load() *Config {
 		DatabaseURL:      getEnv("DATABASE_URL", "./data/blackbox.db"),
 		SecretKey:        mustGetEnv("SECRET_KEY"),
 		DiffServiceURL:   getEnv("DIFF_SERVICE_URL", "http://diff-service:5001"),
+		ClickHouseURL:    getEnv("CLICKHOUSE_URL", ""),
 		LogLevel:         getEnv("LOG_LEVEL", "info"),
 		ReadTimeout:      30 * time.Second,
 		WriteTimeout:     30 * time.Second,

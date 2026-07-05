@@ -1,0 +1,89 @@
+# Default values for blackbox-agentdiff.
+# This is a YAML-formatted file.
+
+replicaCount: 1
+
+image:
+  repository: blackbox/agentdiff
+  tag: latest
+  pullPolicy: IfNotPresent
+
+config:
+  secretKey: "change-me-in-production"
+  logLevel: "info"
+  database:
+    # Use postgres for production. Set to empty for SQLite (dev only).
+    url: "postgres://blackbox:blackbox@postgres:5432/blackbox?sslmode=disable"
+  clickhouse:
+    url: "http://clickhouse:8123"
+  diffService:
+    url: "http://diff-service:5001"
+  monitorInterval: "60s"
+
+service:
+  type: ClusterIP
+  port: 4000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: api.blackbox.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+postgresql:
+  enabled: true
+  auth:
+    username: blackbox
+    password: blackbox
+    database: blackbox
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+
+clickhouse:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 50Gi
+
+diffService:
+  enabled: true
+  image:
+    repository: blackbox/diff-service
+    tag: latest
+  service:
+    port: 5001
+
+web:
+  enabled: true
+  image:
+    repository: blackbox/web
+    tag: latest
+  service:
+    port: 3000
+  config:
+    apiUrl: "http://api:4000"

@@ -272,6 +272,18 @@ export const api = {
   getSpans(traceId: string, apiKey?: string): Promise<Span[]> {
     return request<Span[]>(`/api/v1/traces/${traceId}/spans`, undefined, apiKey);
   },
+  searchTraces(query: string, filters?: Record<string,string>, apiKey?: string): Promise<Trace[]> {
+    return request<Trace[]>('/api/v1/traces/search', {
+      method: 'POST',
+      body: JSON.stringify({ mode: 'structural', query: '', filters: filters || {} }),
+    }, apiKey);
+  },
+  semanticSearch(query: string, apiKey?: string): Promise<(Trace & { similarity: number })[]> {
+    return request<(Trace & { similarity: number })[]>('/api/v1/traces/search', {
+      method: 'POST',
+      body: JSON.stringify({ mode: 'semantic', query, filters: {} }),
+    }, apiKey);
+  },
   deleteTrace(id: string, apiKey?: string): Promise<void> {
     return request<void>(`/api/v1/traces/${id}`, { method: 'DELETE' }, apiKey);
   },

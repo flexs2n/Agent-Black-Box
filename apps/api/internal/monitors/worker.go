@@ -5,6 +5,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/blackbox-agentdiff/api/internal/issues"
 	"github.com/blackbox-agentdiff/api/internal/model"
 	"github.com/blackbox-agentdiff/api/internal/store"
 	"github.com/blackbox-agentdiff/api/internal/webhook"
@@ -122,6 +123,8 @@ func evaluateMonitor(ctx context.Context, st store.Store, dispatcher *webhook.Di
 		if dispatcher != nil {
 			dispatcher.Dispatch(ctx, monitor.ProjectID, "incident.created", payload)
 		}
+		rcaCtx := context.Background()
+		go issues.AnalyzeIncident(rcaCtx, st, dispatcher, incident, monitor, value)
 	} else {
 		if monitor.Status == model.MonitorStatusAlerting {
 			if err := st.MonitorSetFired(ctx, monitor.ID, model.MonitorStatusOK, model.Time{now}); err != nil {

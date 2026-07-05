@@ -6,8 +6,8 @@ services:
     ports:
       - "4000:4000"
     environment:
-      - DATABASE_URL=/app/data/blackbox.db
-      - DUCKDB_PATH=./data/spans.duckdb
+      - DATABASE_URL=postgres://blackbox:blackbox@postgres:5432/blackbox?sslmode=disable
+      - CLICKHOUSE_URL=http://clickhouse:8123
       - SECRET_KEY=dev-secret-key-change-me-in-production
       - DIFF_SERVICE_URL=http://diff-service:5001
       - LOG_LEVEL=info
@@ -21,6 +21,10 @@ services:
     depends_on:
       diff-service:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_started
 
   diff-service:
     build:
@@ -48,3 +52,36 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=blackbox
+      - POSTGRES_PASSWORD=blackbox
+      - POSTGRES_DB=blackbox
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blackbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24-alpine
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - chdata:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  pgdata:
+  chdata:

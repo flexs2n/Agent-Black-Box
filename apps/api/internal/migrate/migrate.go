@@ -10,6 +10,9 @@ import (
 //go:embed migrations/*.sql
 var MigrationsFS embed.FS
 
+//go:embed postgres/*.sql
+var PostgresMigrationsFS embed.FS
+
 func Run(db *sql.DB) error {
 	files, err := fs.Glob(MigrationsFS, "migrations/*.sql")
 	if err != nil {
@@ -28,6 +31,25 @@ func Run(db *sql.DB) error {
 			if _, err := db.Exec(stmt); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func RunPostgres(db *sql.DB) error {
+	files, err := fs.Glob(PostgresMigrationsFS, "postgres/*.sql")
+	if err != nil {
+		return err
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		sqlBytes, err := PostgresMigrationsFS.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		// Execute entire file at once for postgres (DDL with IF NOT EXISTS is safe)
+		if _, err := db.Exec(string(sqlBytes)); err != nil {
+			return err
 		}
 	}
 	return nil

@@ -442,6 +442,14 @@ type MetricWithSparkline struct {
 	Sparkline      []float64 `json:"sparkline"`
 }
 
+type TraceEmbedding struct {
+	TraceID   string  `db:"trace_id" json:"trace_id"`
+	ProjectID string  `db:"project_id" json:"project_id"`
+	Embedding string  `db:"embedding" json:"-"`
+	CreatedAt Time    `db:"created_at" json:"created_at"`
+	Vector    []float32 `json:"-"`
+}
+
 type PresetMetric struct {
 	Slug      string    `json:"slug"`
 	Name      string    `json:"name"`

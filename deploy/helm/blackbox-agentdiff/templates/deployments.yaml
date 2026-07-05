@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "blackbox-agentdiff.fullname" . }}-api
+  labels:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: api
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+        app.kubernetes.io/component: api
+    spec:
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 4000
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.config.database.url | quote }}
+            - name: CLICKHOUSE_URL
+              value: {{ .Values.config.clickhouse.url | quote }}
+            - name: SECRET_KEY
+              value: {{ .Values.config.secretKey | quote }}
+            - name: DIFF_SERVICE_URL
+              value: {{ .Values.config.diffService.url | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: MONITOR_INTERVAL
+              value: {{ .Values.config.monitorInterval | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "blackbox-agentdiff.fullname" . }}-diff-service
+  labels:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: diff-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+      app.kubernetes.io/component: diff-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+        app.kubernetes.io/component: diff-service
+    spec:
+      containers:
+        - name: diff-service
+          image: "{{ .Values.diffService.image.repository }}:{{ .Values.diffService.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.diffService.service.port }}
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: {{ .Values.diffService.service.port | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "blackbox-agentdiff.fullname" . }}-web
+  labels:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+        app.kubernetes.io/component: web
+    spec:
+      containers:
+        - name: web
+          image: "{{ .Values.web.image.repository }}:{{ .Values.web.image.tag }}"
+          ports:
+            - containerPort: {{ .Values.web.service.port }}
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: {{ .Values.web.config.apiUrl | quote }}

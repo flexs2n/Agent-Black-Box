@@ -112,4 +112,9 @@ type Store interface {
 	// Webhook delivery
 	WebhookListByEvent(ctx context.Context, projectID string, eventType string) ([]model.Webhook, error)
 	WebhookDeliveryCreate(ctx context.Context, d model.WebhookDelivery) error
+
+	// Embeddings
+	EmbeddingPut(ctx context.Context, traceID, projectID string, embedding []float32) error
+	EmbeddingGet(ctx context.Context, traceID string) ([]float32, error)
+	EmbeddingListByProject(ctx context.Context, projectID string) ([]model.TraceEmbedding, error)
 }

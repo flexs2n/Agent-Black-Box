@@ -756,6 +756,53 @@ func (s *SQLiteStore) WebhookListByEvent(ctx context.Context, projectID string, 
 	return webhooks, err
 }
 
+func (s *SQLiteStore) EmbeddingPut(ctx context.Context, traceID, projectID string, embedding []float32) error {
+	data, err := json.Marshal(embedding)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `INSERT OR REPLACE INTO trace_embeddings (trace_id, project_id, embedding, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+		traceID, projectID, string(data))
+	return err
+}
+
+func (s *SQLiteStore) EmbeddingGet(ctx context.Context, traceID string) ([]float32, error) {
+	var raw string
+	err := s.db.GetContext(ctx, &raw, `SELECT embedding FROM trace_embeddings WHERE trace_id = ?`, traceID)
+	if err != nil {
+		return nil, err
+	}
+	var vec []float32
+	if err := json.Unmarshal([]byte(raw), &vec); err != nil {
+		return nil, err
+	}
+	return vec, nil
+}
+
+func (s *SQLiteStore) EmbeddingListByProject(ctx context.Context, projectID string) ([]model.TraceEmbedding, error) {
+	var rows []struct {
+		TraceID   string `db:"trace_id"`
+		ProjectID string `db:"project_id"`
+		Embedding string `db:"embedding"`
+		CreatedAt model.Time `db:"created_at"`
+	}
+	err := s.db.SelectContext(ctx, &rows, `SELECT trace_id, project_id, embedding, created_at FROM trace_embeddings WHERE project_id = ?`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]model.TraceEmbedding, len(rows))
+	for i, r := range rows {
+		result[i] = model.TraceEmbedding{
+			TraceID:   r.TraceID,
+			ProjectID: r.ProjectID,
+			Embedding: r.Embedding,
+			CreatedAt: r.CreatedAt,
+		}
+		json.Unmarshal([]byte(r.Embedding), &result[i].Vector)
+	}
+	return result, nil
+}
+
 func (s *SQLiteStore) WebhookDeliveryCreate(ctx context.Context, d model.WebhookDelivery) error {
 	_, err := s.db.NamedExecContext(ctx, `INSERT INTO webhook_deliveries (id, webhook_id, event, payload, status_code, response, attempt, created_at) VALUES (:id, :webhook_id, :event, :payload, :status_code, :response, :attempt, :created_at)`, d)
 	return err

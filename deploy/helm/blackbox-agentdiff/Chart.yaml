@@ -1,0 +1,14 @@
+apiVersion: v2
+name: blackbox-agentdiff
+description: Helm chart for Blackbox AgentDiff — AI agent observability platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - observability
+  - ai-agents
+  - tracing
+  - monitoring
+home: https://blackbox.dev
+maintainers:
+  - name: Blackbox Team

@@ -5,12 +5,15 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/blackbox-agentdiff/api/internal/auth"
 	"github.com/blackbox-agentdiff/api/internal/diffproxy"
+	"github.com/blackbox-agentdiff/api/internal/mcp"
 	"github.com/blackbox-agentdiff/api/internal/model"
+	"github.com/blackbox-agentdiff/api/internal/search"
 	"github.com/blackbox-agentdiff/api/internal/store"
 	"github.com/blackbox-agentdiff/api/internal/webhook"
 	"github.com/go-chi/chi/v5"
@@ -18,13 +21,21 @@ import (
 )
 
 type Handlers struct {
-	store      store.Store
-	diffClient *diffproxy.Client
-	dispatcher *webhook.Dispatcher
+	store       store.Store
+	diffClient  *diffproxy.Client
+	dispatcher  *webhook.Dispatcher
+	mcpServer   *mcp.Server
+	embedder    *search.OpenAIEmbedder
 }
 
 func New(st store.Store, diffClient *diffproxy.Client, dispatcher *webhook.Dispatcher) *Handlers {
-	return &Handlers{store: st, diffClient: diffClient, dispatcher: dispatcher}
+	return &Handlers{
+		store:      st,
+		diffClient: diffClient,
+		dispatcher: dispatcher,
+		mcpServer:  mcp.NewServer(st, diffClient),
+		embedder:   search.NewOpenAIEmbedder(),
+	}
 }
 
 func (h *Handlers) Register(r chi.Router) {
@@ -46,6 +57,7 @@ func (h *Handlers) Register(r chi.Router) {
 			authed.Delete("/traces/{id}", h.DeleteTrace)
 			authed.Delete("/traces", h.DeleteTraces)
 			authed.Post("/traces/search", h.SearchTraces)
+			authed.Post("/mcp", h.mcpServer.ServeHTTP)
 			authed.Post("/diffs", h.ComputeDiff)
 			authed.Post("/diffs/batch", h.ComputeBatchDiff)
 			authed.Get("/diffs/{id}", h.GetDiff)
@@ -211,17 +223,92 @@ func (h *Handlers) SearchTraces(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	var filters store.TraceSearchFilters
-	if err := json.NewDecoder(r.Body).Decode(&filters); err != nil {
+
+	var req struct {
+		Mode    string                    `json:"mode"`
+		Query   string                    `json:"query"`
+		Filters store.TraceSearchFilters  `json:"filters"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	traces, err := h.store.TraceSearch(r.Context(), projectID, filters)
+
+	if req.Mode == "semantic" && req.Query != "" {
+		h.semanticSearch(w, r, projectID, req.Query)
+		return
+	}
+
+	traces, err := h.store.TraceSearch(r.Context(), projectID, req.Filters)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(traces)
+}
+
+func (h *Handlers) semanticSearch(w http.ResponseWriter, r *http.Request, projectID, query string) {
+	queryVec, err := h.embedder.Embed(r.Context(), query)
+	if err != nil {
+		http.Error(w, "embedding failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	embeddings, err := h.store.EmbeddingListByProject(r.Context(), projectID)
+	if err != nil || len(embeddings) == 0 {
+		http.Error(w, "no indexed traces found for semantic search", http.StatusNotFound)
+		return
+	}
+
+	type scored struct {
+		TraceID    string
+		Similarity float64
+	}
+	var results []scored
+	for _, emb := range embeddings {
+		if len(emb.Vector) == 0 {
+			continue
+		}
+		sim := search.CosineSimilarity(queryVec, emb.Vector)
+		results = append(results, scored{TraceID: emb.TraceID, Similarity: sim})
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Similarity > results[j].Similarity
+	})
+
+	if len(results) > 20 {
+		results = results[:20]
+	}
+
+	ids := make([]string, len(results))
+	for i, r := range results {
+		ids[i] = r.TraceID
+	}
+
+	traces, err := h.store.TraceGetByIDs(r.Context(), ids)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	traceMap := make(map[string]model.Trace)
+	for _, t := range traces {
+		traceMap[t.ID] = t
+	}
+
+	type traceWithScore struct {
+		model.Trace
+		Similarity float64 `json:"similarity"`
+	}
+	output := make([]traceWithScore, 0, len(results))
+	for _, r := range results {
+		if t, ok := traceMap[r.TraceID]; ok {
+			output = append(output, traceWithScore{Trace: t, Similarity: r.Similarity})
+		}
+	}
+
+	json.NewEncoder(w).Encode(output)
 }
 
 func (h *Handlers) ComputeDiff(w http.ResponseWriter, r *http.Request) {

@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "blackbox-agentdiff.fullname" . }}-api
+  labels:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: api
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 4000
+  selector:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "blackbox-agentdiff.fullname" . }}-diff-service
+  labels:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: diff-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.diffService.service.port }}
+      targetPort: {{ .Values.diffService.service.port }}
+  selector:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: diff-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "blackbox-agentdiff.fullname" . }}-web
+  labels:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.web.service.port }}
+      targetPort: {{ .Values.web.service.port }}
+  selector:
+    app.kubernetes.io/name: {{ include "blackbox-agentdiff.name" . }}
+    app.kubernetes.io/component: web
