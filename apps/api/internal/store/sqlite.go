@@ -34,7 +34,7 @@ func (s *SQLiteStore) ProjectCreate(ctx context.Context, p model.ProjectCreate) 
 		ID:        uuid.New().String(),
 		Name:      p.Name,
 		Slug:      p.Slug,
-		CreatedAt: model.Time{time.Now()},
+		CreatedAt: model.Time{Time: time.Now()},
 	}
 	if p.Settings != nil {
 		b, _ := json.Marshal(p.Settings)
@@ -84,7 +84,7 @@ func (s *SQLiteStore) APIKeyCreate(ctx context.Context, projectID, label, keyHas
 		Label:     label,
 		KeyHash:   keyHash,
 		KeyPrefix: keyPrefix,
-		CreatedAt: model.Time{time.Now()},
+		CreatedAt: model.Time{Time: time.Now()},
 	}
 	_, err := s.db.NamedExecContext(ctx, `INSERT INTO api_keys (id, project_id, label, key_hash, key_prefix) VALUES (:id, :project_id, :label, :key_hash, :key_prefix)`, key)
 	return key, err
@@ -108,7 +108,7 @@ func (s *SQLiteStore) APIKeyDelete(ctx context.Context, projectID, keyID string)
 }
 
 func (s *SQLiteStore) APIKeyMarkUsed(ctx context.Context, keyID string) error {
-	now := model.Time{time.Now().UTC()}
+	now := model.Time{Time: time.Now().UTC()}
 	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET last_used_at = ? WHERE id = ?`, now, keyID)
 	return err
 }
@@ -250,7 +250,7 @@ func (s *SQLiteStore) BaselineCreate(ctx context.Context, b model.BaselineCreate
 		TraceID:   b.TraceID,
 		Label:     b.Label,
 		Notes:     b.Notes,
-		CreatedAt: model.Time{time.Now()},
+		CreatedAt: model.Time{Time: time.Now()},
 	}
 	_, err := s.db.NamedExecContext(ctx, `INSERT INTO baselines (id, project_id, trace_id, label, notes) VALUES (:id, :project_id, :trace_id, :label, :notes)`, baseline)
 	return baseline, err
@@ -292,7 +292,7 @@ func (s *SQLiteStore) DiffGetByTraces(ctx context.Context, projectID, traceAID, 
 
 // Issues
 func (s *SQLiteStore) IssueCreate(ctx context.Context, issue model.IssueCreate) (model.Issue, error) {
-	now := model.Time{time.Now()}
+	now := model.Time{Time: time.Now()}
 	issueModel := model.Issue{
 		ID:          uuid.New().String(),
 		ProjectID:   issue.ProjectID,
@@ -337,7 +337,7 @@ func (s *SQLiteStore) IssueUpdate(ctx context.Context, issueID string, update mo
 	if err != nil {
 		return existing, err
 	}
-	now := model.Time{time.Now()}
+	now := model.Time{Time: time.Now()}
 	if update.Status != nil {
 		existing.Status = *update.Status
 		existing.UpdatedAt = now
@@ -364,7 +364,7 @@ func (s *SQLiteStore) IssueOccurrenceCreate(ctx context.Context, occ model.Issue
 		IssueID:   occ.IssueID,
 		TraceID:   occ.TraceID,
 		Evidence:  occ.Evidence,
-		CreatedAt: model.Time{time.Now()},
+		CreatedAt: model.Time{Time: time.Now()},
 	}
 	_, err := s.db.NamedExecContext(ctx, `INSERT INTO issue_occurrences (id, issue_id, trace_id, evidence, created_at) VALUES (:id, :issue_id, :trace_id, :evidence, :created_at)`, occurrence)
 	if err != nil {
@@ -389,8 +389,8 @@ func (s *SQLiteStore) MetricCreate(ctx context.Context, metric model.MetricCreat
 		Aggregation: metric.Aggregation,
 		FilterJSON:  metric.FilterJSON,
 		WindowSecs:  metric.WindowSecs,
-		CreatedAt:   model.Time{time.Now()},
-		UpdatedAt:   model.Time{time.Now()},
+		CreatedAt:   model.Time{Time: time.Now()},
+		UpdatedAt:   model.Time{Time: time.Now()},
 	}
 	_, err := s.db.NamedExecContext(ctx, `INSERT INTO metrics (id, project_id, name, aggregation, filter_json, window_secs, created_at, updated_at) VALUES (:id, :project_id, :name, :aggregation, :filter_json, :window_secs, :created_at, :updated_at)`, m)
 	return m, err
@@ -413,7 +413,7 @@ func (s *SQLiteStore) MetricUpdate(ctx context.Context, metricID string, update 
 	if err != nil {
 		return existing, err
 	}
-	now := model.Time{time.Now()}
+	now := model.Time{Time: time.Now()}
 	if update.Name != nil {
 		existing.Name = *update.Name
 	}
@@ -453,8 +453,8 @@ func (s *SQLiteStore) MonitorCreate(ctx context.Context, m model.MonitorCreate) 
 		Severity:   m.Severity,
 		Status:     model.MonitorStatusOK,
 		NotifyJSON: m.NotifyJSON,
-		CreatedAt:  model.Time{time.Now()},
-		UpdatedAt:  model.Time{time.Now()},
+		CreatedAt:  model.Time{Time: time.Now()},
+		UpdatedAt:  model.Time{Time: time.Now()},
 	}
 	_, err := s.db.NamedExecContext(ctx, `INSERT INTO monitors (id, metric_id, project_id, condition, threshold, severity, status, notify_json, created_at, updated_at) VALUES (:id, :metric_id, :project_id, :condition, :threshold, :severity, :status, :notify_json, :created_at, :updated_at)`, monitor)
 	return monitor, err
@@ -477,7 +477,7 @@ func (s *SQLiteStore) MonitorUpdate(ctx context.Context, monitorID string, updat
 	if err != nil {
 		return existing, err
 	}
-	now := model.Time{time.Now()}
+	now := model.Time{Time: time.Now()}
 	if update.Condition != nil {
 		existing.Condition = *update.Condition
 	}
@@ -563,8 +563,8 @@ func (s *SQLiteStore) WebhookCreate(ctx context.Context, webhook model.WebhookCr
 		SecretHash: webhook.Secret,
 		Events:     "[]",
 		Enabled:    webhook.Enabled,
-		CreatedAt:  model.Time{time.Now()},
-		UpdatedAt:  model.Time{time.Now()},
+		CreatedAt:  model.Time{Time: time.Now()},
+		UpdatedAt:  model.Time{Time: time.Now()},
 	}
 	eventsJSON, _ := json.Marshal(webhook.Events)
 	w.Events = string(eventsJSON)
@@ -602,7 +602,7 @@ func (s *SQLiteStore) WebhookUpdate(ctx context.Context, webhookID string, updat
 	if update.Enabled != nil {
 		existing.Enabled = *update.Enabled
 	}
-	existing.UpdatedAt = model.Time{time.Now()}
+	existing.UpdatedAt = model.Time{Time: time.Now()}
 	_, err = s.db.NamedExecContext(ctx, `UPDATE webhooks SET url = :url, secret_hash = :secret_hash, events = :events, enabled = :enabled, updated_at = :updated_at WHERE id = :id`, existing)
 	return existing, err
 }

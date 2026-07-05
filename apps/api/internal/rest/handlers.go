@@ -410,7 +410,7 @@ func (h *Handlers) ComputeDiff(w http.ResponseWriter, r *http.Request) {
 		TraceBID:        traceBID,
 		SimilarityScore: &similarityScore,
 		DiffResultJSON:  &diffResultStr,
-		CreatedAt:       model.Time{time.Now()},
+		CreatedAt:       model.Time{Time: time.Now()},
 	}
 	if err := h.store.DiffPut(r.Context(), diff); err != nil {
 		http.Error(w, "failed to cache diff: "+err.Error(), http.StatusInternalServerError)
@@ -1151,7 +1151,7 @@ func (h *Handlers) UpdateIncidentStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if req.Status != nil && (*req.Status == model.IncidentStatusResolved || *req.Status == model.IncidentStatusDismissed) {
-		now := model.Time{time.Now()}
+		now := model.Time{Time: time.Now()}
 		req.ResolvedAt = &now
 	}
 	_, err = h.store.IncidentUpdate(r.Context(), incidentID, req)

@@ -72,7 +72,7 @@ type WordDiffChunk struct {
 }
 
 type JsonDiffNode struct {
-	key      string         `json:"key"`
+	Key      string         `json:"key"`
 	Type     string         `json:"type"`
 	ValueA   interface{}    `json:"valueA,omitempty"`
 	ValueB   interface{}    `json:"valueB,omitempty"`

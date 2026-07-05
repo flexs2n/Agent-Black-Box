@@ -146,8 +146,8 @@ func (c *ClickHouseSpanStore) SpanList(ctx context.Context, traceID string) ([]m
 			Name:         row.Name,
 			SpanKind:     row.SpanKind,
 			Status:       row.Status,
-			StartedAt:    model.Time{time.UnixMilli(int64(row.StartedAt * 1000))},
-			EndedAt:      model.Time{time.UnixMilli(int64(row.EndedAt * 1000))},
+			StartedAt:    model.Time{Time: time.UnixMilli(int64(row.StartedAt * 1000))},
+			EndedAt:      model.Time{Time: time.UnixMilli(int64(row.EndedAt * 1000))},
 			DurationMs:   row.DurationMs,
 			Attributes:   row.Attributes,
 		})

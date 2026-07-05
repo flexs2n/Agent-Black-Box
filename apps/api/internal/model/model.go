@@ -61,7 +61,7 @@ type Project struct {
 type ProjectCreate struct {
 	Name     string         `json:"name" validate:"required"`
 	Slug     string         `json:"slug" validate:"required,slug"`
-	Settings map[string]any `json:"settings" omitempty`
+	Settings map[string]any `json:"settings,omitempty"`
 }
 
 type ProjectUpdate struct {

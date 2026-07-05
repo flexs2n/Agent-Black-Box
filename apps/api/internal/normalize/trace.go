@@ -59,8 +59,8 @@ func NormalizeTrace(rawSpans []RawSpan) ([]model.Span, model.Trace, model.TraceS
 			Name:         rs.Name,
 			SpanKind:     spanKind,
 			Status:       status,
-			StartedAt:    model.Time{time.Unix(0, rs.StartTimeUnix)},
-			EndedAt:      model.Time{time.Unix(0, rs.EndTimeUnix)},
+			StartedAt:    model.Time{Time: time.Unix(0, rs.StartTimeUnix)},
+			EndedAt:      model.Time{Time: time.Unix(0, rs.EndTimeUnix)},
 			DurationMs:   rs.EndTimeUnix - rs.StartTimeUnix,
 			Attributes:   string(attrsJSON),
 		}
@@ -73,8 +73,8 @@ func NormalizeTrace(rawSpans []RawSpan) ([]model.Span, model.Trace, model.TraceS
 	}
 
 	rootSpan := findRootSpan(rawSpans)
-	startedAt := model.Time{time.Unix(0, rootSpan.StartTimeUnix)}
-	endedAt := model.Time{time.Unix(0, rootSpan.EndTimeUnix)}
+	startedAt := model.Time{Time: time.Unix(0, rootSpan.StartTimeUnix)}
+	endedAt := model.Time{Time: time.Unix(0, rootSpan.EndTimeUnix)}
 	durationMs := rootSpan.EndTimeUnix - rootSpan.StartTimeUnix
 
 	runID := getStringValue(rootSpan.ResourceAttrs, "run.id")
@@ -105,7 +105,7 @@ func NormalizeTrace(rawSpans []RawSpan) ([]model.Span, model.Trace, model.TraceS
 		StartedAt:   &startedAt,
 		EndedAt:     &endedAt,
 		DurationMs:  &durationMs,
-		CreatedAt:   model.Time{time.Now()},
+		CreatedAt:   model.Time{Time: time.Now()},
 	}
 
 	spans := make([]model.Span, 0, len(spanMap))
@@ -178,7 +178,7 @@ func computeTraceStats(spans []model.Span, traceID, projectID string) model.Trac
 		TotalInputTokens:  0,
 		TotalOutputTokens: 0,
 		TotalTokens:       0,
-		CreatedAt:         model.Time{time.Now()},
+		CreatedAt:         model.Time{Time: time.Now()},
 	}
 
 	for _, sp := range spans {

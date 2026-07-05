@@ -61,7 +61,7 @@ func (d *Dispatcher) dispatchOne(wh model.Webhook, eventType string, payload int
 			Event:     eventType,
 			Payload:   string(body),
 			Attempt:   attempt,
-			CreatedAt: model.Time{time.Now()},
+			CreatedAt: model.Time{Time: time.Now()},
 		}
 		mac := hmac.New(sha256.New, []byte(wh.SecretHash))
 		mac.Write(body)
@@ -103,7 +103,7 @@ func (d *Dispatcher) dispatchOne(wh model.Webhook, eventType string, payload int
 		delivery.Response = &respStr
 
 		if code >= 200 && code < 300 {
-			now := model.Time{time.Now()}
+			now := model.Time{Time: time.Now()}
 			delivery.DeliveredAt = &now
 			d.store.WebhookDeliveryCreate(context.Background(), delivery)
 			return

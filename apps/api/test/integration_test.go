@@ -137,7 +137,7 @@ func TestStore_IngestAndQueryTrace(t *testing.T) {
 
 	traceID := uuid.New().String()
 	spanID := uuid.New().String()[:16]
-	now := model.Time{time.Now()}
+	now := model.Time{Time: time.Now()}
 
 	trace := model.Trace{
 		ID:          traceID,
@@ -252,7 +252,7 @@ func TestStore_BaselineAndDiff(t *testing.T) {
 		TraceBID:        uuid.New().String(),
 		SimilarityScore: &score,
 		DiffResultJSON:  stringPtr(`{"test":true}`),
-		CreatedAt:       model.Time{time.Now()},
+		CreatedAt:       model.Time{Time: time.Now()},
 	}
 	if err := st.DiffPut(ctx, diff); err != nil {
 		t.Fatalf("diff put: %v", err)
@@ -360,7 +360,7 @@ func TestStore_MonitorSetFired(t *testing.T) {
 		Threshold: 100,
 	})
 
-	if err := st.MonitorSetFired(ctx, created.ID, model.MonitorStatusAlerting, model.Time{time.Now()}); err != nil {
+	if err := st.MonitorSetFired(ctx, created.ID, model.MonitorStatusAlerting, model.Time{Time: time.Now()}); err != nil {
 		t.Fatalf("monitor set fired: %v", err)
 	}
 
@@ -404,7 +404,7 @@ func TestStore_IncidentLifecycle(t *testing.T) {
 		MonitorID: monitor.ID,
 		ProjectID: project.ID,
 		Status:    model.IncidentStatusUnresolved,
-		CreatedAt: model.Time{time.Now()},
+		CreatedAt: model.Time{Time: time.Now()},
 	}
 	created, err := st.IncidentCreate(ctx, incident)
 	if err != nil {
@@ -433,7 +433,7 @@ func TestStore_IncidentLifecycle(t *testing.T) {
 	}
 
 	// Update with resolved status + resolved_at
-	now := model.Time{time.Now()}
+	now := model.Time{Time: time.Now()}
 	updated, err := st.IncidentUpdate(ctx, created.ID, model.IncidentUpdate{
 		Status:     incidentStatusPtr(model.IncidentStatusResolved),
 		ResolvedAt: &now,
@@ -506,7 +506,7 @@ func TestWorker_EvaluateMonitor(t *testing.T) {
 		MonitorID: monitor.ID,
 		ProjectID: project.ID,
 		Status:    model.IncidentStatusUnresolved,
-		CreatedAt: model.Time{time.Now()},
+		CreatedAt: model.Time{Time: time.Now()},
 	}
 	if _, err := st.IncidentCreate(ctx, incident); err != nil {
 		t.Fatalf("incident create: %v", err)

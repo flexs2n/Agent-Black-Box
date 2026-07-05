@@ -103,13 +103,13 @@ func evaluateMonitor(ctx context.Context, st store.Store, dispatcher *webhook.Di
 			MonitorID: monitor.ID,
 			ProjectID: monitor.ProjectID,
 			Status:    model.IncidentStatusUnresolved,
-			CreatedAt: model.Time{now},
+			CreatedAt: model.Time{Time: now},
 		}
 		if _, err := st.IncidentCreate(ctx, incident); err != nil {
 			log.Printf("monitor worker: incident create: %v", err)
 			return
 		}
-		if err := st.MonitorSetFired(ctx, monitor.ID, model.MonitorStatusAlerting, model.Time{now}); err != nil {
+		if err := st.MonitorSetFired(ctx, monitor.ID, model.MonitorStatusAlerting, model.Time{Time: now}); err != nil {
 			log.Printf("monitor worker: monitor set fired: %v", err)
 		}
 		payload := IncidentPayload{
@@ -127,7 +127,7 @@ func evaluateMonitor(ctx context.Context, st store.Store, dispatcher *webhook.Di
 		go issues.AnalyzeIncident(rcaCtx, st, dispatcher, incident, monitor, value)
 	} else {
 		if monitor.Status == model.MonitorStatusAlerting {
-			if err := st.MonitorSetFired(ctx, monitor.ID, model.MonitorStatusOK, model.Time{now}); err != nil {
+			if err := st.MonitorSetFired(ctx, monitor.ID, model.MonitorStatusOK, model.Time{Time: now}); err != nil {
 				log.Printf("monitor worker: monitor set ok: %v", err)
 			}
 		}
